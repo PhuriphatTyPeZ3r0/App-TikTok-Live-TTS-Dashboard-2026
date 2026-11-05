@@ -6,6 +6,8 @@ Cloud Web Platform. It handles multi-tenant session creation, dual token-based a
 queue purges (CONTROL_FLUSH), health probes, and test speech synthesis injection.
 """
 
+import asyncio
+from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 import secrets
@@ -22,14 +24,98 @@ from pydantic import BaseModel, Field
 from src.config import AppConfig, load_config, normalize_tunnel_url
 from src.queue_manager import TTSItem
 from src.session_manager import SessionInstance, SessionManager
+from src.tts_engine import TTSEngine
 
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI application instance
+# Singleton in-memory session registry and lifecycle manager
+session_manager = SessionManager()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application startup, session bootstrapping, pre-warming, and graceful shutdown.
+
+    Asynchronous Server Gateway Interface (ASGI) lifespan context manager that automates
+    creator session initialization on deployment platforms (such as Render or Docker) and
+    dispatches remote Zero-cost Graphics Processing Unit (ZeroGPU) pre-warming requests.
+
+    Voice branding reference: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert) with 'yuta' backward-compatible alias.
+    """
+    # 1. Startup phase: Ensure app.state.config is loaded (fallback to empty config if failed)
+    try:
+        if not hasattr(app.state, "config") or app.state.config is None:
+            app.state.config = load_config()
+    except Exception:
+        app.state.config = AppConfig(tiktok_username="", fish_audio_api_key="")
+
+    # 2. If app.state.tts_engine is not yet set, initialize default TTSEngine
+    if getattr(app.state, "tts_engine", None) is None:
+        try:
+            app.state.tts_engine = TTSEngine(app.state.config)
+        except Exception as exc:
+            logger.warning("Failed to initialize default TTSEngine during startup: %s", exc)
+
+    # 3. If app.state.config.tiktok_username is non-empty (stripped): auto-bootstrap default session
+    config: Optional[AppConfig] = getattr(app.state, "config", None)
+    creator_username = config.tiktok_username.strip() if config and config.tiktok_username else ""
+    if creator_username:
+        default_session = getattr(app.state, "default_session", None)
+        if default_session is None:
+            for s in session_manager.get_all_sessions():
+                if s.tiktok_username.strip() == creator_username:
+                    default_session = s
+                    break
+
+        if default_session is None:
+            default_session = session_manager.create_session(
+                tiktok_username=config.tiktok_username,
+                fish_audio_api_key=config.fish_audio_api_key,
+                user_cooldown=getattr(config, "user_cooldown_seconds", 5),
+                max_comment_length=getattr(config, "max_comment_length", 80),
+                colab_tunnel_url=config.colab_tunnel_url,
+                prefer_colab_tts=config.prefer_colab_tts,
+                colab_tts_timeout_seconds=config.colab_tts_timeout_seconds,
+                hf_token=config.hf_token,
+            )
+
+        app.state.default_session = default_session
+        asyncio.create_task(default_session.start())
+        logger.info("Automated session auto-bootstrapping initiated for TikTok creator: %s", config.tiktok_username)
+
+    # 4. If app.state.tts_engine and app.state.config.colab_tunnel_url: dispatch pre-warming ping
+    tts_engine = getattr(app.state, "tts_engine", None)
+    if tts_engine and config and getattr(config, "colab_tunnel_url", None):
+        asyncio.create_task(tts_engine.warm_remote_engine())
+        logger.info("Dispatched asynchronous pre-warming ping for remote ZeroGPU / Colab endpoint: %s", config.colab_tunnel_url)
+
+    yield
+
+    # 5. Shutdown phase: Gracefully terminate all active streaming sessions
+    for session in session_manager.get_all_sessions():
+        is_running = getattr(session, "is_running", False)
+        if callable(is_running):
+            is_running = is_running()
+        if is_running:
+            try:
+                res = session.stop()
+                if asyncio.iscoroutine(res):
+                    await res
+            except Exception as exc:
+                logger.warning(
+                    "Error terminating session %s during lifespan shutdown: %s",
+                    getattr(session, "session_id", "unknown"),
+                    exc,
+                )
+    logger.info("FastAPI lifespan shutdown complete: terminated active live stream sessions.")
+
+
+# Initialize FastAPI application instance with lifespan event orchestration
 app = FastAPI(
     title="TikTok Live TTS Cloud Web Platform",
     description="Multi-tenant cloud platform bridging TikTok Live chat events with Text-to-Speech (TTS) synthesis for streaming overlays.",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 # Cross-Origin Resource Sharing (CORS) middleware configuration
@@ -51,9 +137,6 @@ TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-
-# Singleton in-memory session registry and lifecycle manager
-session_manager = SessionManager()
 
 # Initialize default application configuration and TTS engine state
 try:
@@ -401,6 +484,7 @@ async def start_session(payload: StartSessionRequest, request: Request) -> Dict[
     colab_tunnel_url = app_config.colab_tunnel_url if app_config else None
     prefer_colab_tts = app_config.prefer_colab_tts if app_config else True
     colab_tts_timeout_seconds = app_config.colab_tts_timeout_seconds if app_config else 5.0
+    hf_token = app_config.hf_token if app_config else None
 
     session: SessionInstance = session_manager.create_session(
         tiktok_username=payload.tiktok_username,
@@ -415,6 +499,7 @@ async def start_session(payload: StartSessionRequest, request: Request) -> Dict[
         colab_tunnel_url=colab_tunnel_url,
         prefer_colab_tts=prefer_colab_tts,
         colab_tts_timeout_seconds=colab_tts_timeout_seconds,
+        hf_token=hf_token,
     )
 
     return {

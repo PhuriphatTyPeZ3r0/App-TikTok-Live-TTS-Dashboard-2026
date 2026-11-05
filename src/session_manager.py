@@ -70,10 +70,44 @@ class SessionInstance:
     ingestion_service: Optional[TikTokIngestionService] = None
     created_at: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
+    _is_running: bool = field(default=False, repr=False)
 
     def touch(self) -> None:
         """Update the last_active timestamp to the current Unix epoch time."""
         self.last_active = time.time()
+
+    @property
+    def is_running(self) -> bool:
+        """Check whether the live stream session is actively running.
+
+        Returns:
+            bool: True if the session or its ingestion service is active, False otherwise.
+        """
+        if self.ingestion_service is not None:
+            return getattr(self.ingestion_service, "_running", False) or self._is_running
+        return self._is_running
+
+    async def start(self) -> None:
+        """Start the live stream session and underlying live event ingestion loop."""
+        if self._is_running:
+            return
+        self._is_running = True
+        self.touch()
+        if self.ingestion_service is not None:
+            res = self.ingestion_service.start()
+            if asyncio.iscoroutine(res):
+                await res
+
+    async def stop(self) -> None:
+        """Gracefully terminate the live stream session and underlying ingestion service."""
+        if not self._is_running:
+            return
+        self._is_running = False
+        self.touch()
+        if self.ingestion_service is not None:
+            res = self.ingestion_service.stop()
+            if asyncio.iscoroutine(res):
+                await res
 
 
 class SessionManager:
@@ -103,12 +137,15 @@ class SessionManager:
         colab_tunnel_url: Optional[str] = None,
         prefer_colab_tts: bool = True,
         colab_tts_timeout_seconds: float = 5.0,
+        hf_token: Optional[str] = None,
     ) -> SessionInstance:
         """Create and register a new multi-tenant live stream session.
 
         Initializes independent TextNormalizer, TTSQueueManager, and TTSEngine instances,
         merges custom phonetics and blacklist entries, and generates unique
         dual security tokens.
+
+        Voice branding reference: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert) with 'yuta' alias.
 
         Args:
             tiktok_username: Target TikTok creator username (e.g., '@username').
@@ -123,6 +160,7 @@ class SessionManager:
             colab_tunnel_url: Optional Google Colab Cloudflare tunnel URL.
             prefer_colab_tts: Flag prioritizing Google Colab Edge-TTS over local fallback.
             colab_tts_timeout_seconds: Request timeout in seconds for Colab TTS synthesis.
+            hf_token: Optional Bearer authentication token for Hugging Face (HF) Spaces / Zero-cost Graphics Processing Unit (ZeroGPU).
 
         Returns:
             SessionInstance: The newly created and registered session instance.
@@ -149,17 +187,19 @@ class SessionManager:
         # Initialize dedicated queue manager with session-specific cooldown
         queue_manager = TTSQueueManager(cooldown_seconds=user_cooldown)
 
-        # Initialize dedicated TTS synthesis engine with streamer's API key and Colab settings
+        # Initialize dedicated TTS synthesis engine with streamer's API key, Colab settings, and HF token
         tts_engine = TTSEngine(
             api_key=fish_audio_api_key,
             colab_tunnel_url=colab_tunnel_url,
             prefer_colab_tts=prefer_colab_tts,
             colab_tts_timeout_seconds=colab_tts_timeout_seconds,
+            hf_token=hf_token,
         )
         if hasattr(tts_engine, "_config"):
             tts_engine._config.colab_tunnel_url = colab_tunnel_url
             tts_engine._config.prefer_colab_tts = prefer_colab_tts
             tts_engine._config.colab_tts_timeout_seconds = colab_tts_timeout_seconds
+            tts_engine._config.hf_token = hf_token
 
         now = time.time()
         instance = SessionInstance(
