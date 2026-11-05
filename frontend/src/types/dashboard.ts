@@ -90,6 +90,8 @@ export interface UseDashboardSocketOptions {
   wsUrl?: string;
   /** Whether the socket should automatically connect on mount. Defaults to true. */
   enabled?: boolean;
+  /** Optional callback invoked on every inbound WebSocket event envelope. */
+  onEvent?: (event: DashboardEvent) => void;
 }
 
 /**
@@ -124,4 +126,12 @@ export interface UseDashboardSocketReturn {
   connect: () => void;
   /** Gracefully terminate the WebSocket (WS) connection. */
   disconnect: () => void;
+  /** Skip current audio playback on the server and broadcast control_skip. */
+  skipAudio: () => void;
+  /** Pause audio playback on the server and broadcast control_pause. */
+  pauseAudio: () => void;
+  /** Resume paused audio playback on the server and broadcast control_resume. */
+  resumeAudio: () => void;
+  /** Purge the playback queue on the server and broadcast control_clear. */
+  clearQueue: () => void;
 }

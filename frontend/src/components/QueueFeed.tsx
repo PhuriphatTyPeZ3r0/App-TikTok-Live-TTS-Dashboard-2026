@@ -10,7 +10,7 @@
 
 import React from "react";
 import { QueueItem } from "../types/tikfinity";
-import { MessageSquare, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 export interface QueueFeedProps {
   queue: (QueueItem | any)[];

@@ -13,7 +13,7 @@
 import React from "react";
 import { QueueItem } from "../types/tikfinity";
 import type { SpeakingItem } from "../types/dashboard";
-import { Radio, Mic, Volume2 } from "lucide-react";
+import { Radio, Mic } from "lucide-react";
 
 export interface NowSpeakingCardProps {
   currentSpeaker: QueueItem | SpeakingItem | any | null;

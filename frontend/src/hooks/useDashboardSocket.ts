@@ -88,6 +88,7 @@ export function useDashboardSocket({
   backendUrl = "",
   wsUrl,
   enabled = true,
+  onEvent,
 }: UseDashboardSocketOptions): UseDashboardSocketReturn {
   // Connection states
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -102,12 +103,17 @@ export function useDashboardSocket({
   const [colabSettings, setColabSettings] =
     useState<ColabSettings>(DEFAULT_COLAB_SETTINGS);
 
-  // Stable references for timer IDs and WebSocket instance
+  // Stable references for timer IDs, event callback and WebSocket instance
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const attemptRef = useRef<number>(0);
   const isMountedRef = useRef<boolean>(true);
+  const onEventRef = useRef(onEvent);
+
+  useEffect(() => {
+    onEventRef.current = onEvent;
+  }, [onEvent]);
 
   /**
    * Safely dispatch a JavaScript Object Notation (JSON) payload over the active socket.
@@ -206,6 +212,9 @@ export function useDashboardSocket({
         if (!isMountedRef.current) return;
         try {
           const payload: DashboardEvent = JSON.parse(event.data);
+
+          // Dispatch to external event listener if subscribed
+          onEventRef.current?.(payload);
 
           // 1. Emergency Queue Purge (CONTROL_FLUSH)
           if (payload.type === "CONTROL_FLUSH") {
@@ -520,6 +529,39 @@ export function useDashboardSocket({
     }));
   }, []);
 
+  /**
+   * Action: Skip currently playing audio broadcast via WebSocket.
+   */
+  const skipAudio = useCallback(() => {
+    sendJson({ action: "control_skip", session_id: sessionId });
+    setSpeakingItem(null);
+  }, [sendJson, sessionId]);
+
+  /**
+   * Action: Pause audio synthesis and playback via WebSocket.
+   */
+  const pauseAudio = useCallback(() => {
+    sendJson({ action: "control_pause", session_id: sessionId });
+  }, [sendJson, sessionId]);
+
+  /**
+   * Action: Resume paused audio synthesis and playback via WebSocket.
+   */
+  const resumeAudio = useCallback(() => {
+    sendJson({ action: "control_resume", session_id: sessionId });
+  }, [sendJson, sessionId]);
+
+  /**
+   * Action: Purge queue and stop current speech broadcast via WebSocket.
+   */
+  const clearQueue = useCallback(() => {
+    sendJson({ action: "control_clear", session_id: sessionId });
+    sendJson({ action: "CONTROL_FLUSH" });
+    setQueue([]);
+    setSpeakingItem(null);
+    setStats((prev) => ({ ...prev, current_queue_size: 0 }));
+  }, [sendJson, sessionId]);
+
   // Lifecycle initialization
   useEffect(() => {
     isMountedRef.current = true;
@@ -549,5 +591,9 @@ export function useDashboardSocket({
     skipItem,
     connect,
     disconnect,
+    skipAudio,
+    pauseAudio,
+    resumeAudio,
+    clearQueue,
   };
 }

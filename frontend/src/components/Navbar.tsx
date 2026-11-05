@@ -1,59 +1,61 @@
 "use client";
 
 /**
- * Red Broadcast Navigation Bar Component for Next.js 15.
+ * TikFinity-Style Navigation Bar Component for Next.js 15.
  *
- * Implements 56px height, Level 1 elevation shadow, centralized search bar with
- * voice search, real-time multi-system telemetry (TikTok Live, Colab Tesla T4 GPU, OBS Studio),
- * theme toggling (Light / Cinema Dark), and backward-compatible props.
+ * Implements TikFinity-inspired header design:
+ * - Brand logo: "TF" with pink/cyan gradient box
+ * - Title: "TikTok Live TTS Stream Console"
+ * - Subtitle: "TikFinity Cleansed Edition • 24/7 Cloud Powered"
+ * - Status badges:
+ *     - LIVE badge with pulsing dot: `LIVE: @{username || 'phuriphat_live'}`
+ *     - Voice engine badge: `🎙️ Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ)`
+ * - Quick Voice Test button with loading indicator
+ * - TTS Master toggle switch (masterTtsEnabled / onToggleMaster)
+ * - Optional theme toggler and account/room switcher
  *
- * Integrates Single-Page Application (SPA) architecture with the FastAPI
- * Asynchronous Server Gateway Interface (ASGI) server, coordinating with
- * the Web Audio Application Programming Interface (Web Audio API) and
- * First-In, First-Out (FIFO) speech synthesis queue states.
- *
- * Design System: Red Broadcast Studio
- * Compatibility: Liquid Glass & Specular Border backward tokens (liquid-glass specular-border)
- * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert) - Thai Voice Model
+ * Voice Actor Model: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  */
 
 import React, { useState } from "react";
 import {
-  Menu,
-  Play,
-  Search,
-  Mic,
+  Volume2,
+  Loader2,
   Sun,
   Moon,
-  Bell,
-  Zap,
-  Radio,
   Tv,
   Copy,
   Check,
   ExternalLink,
   User,
+  Radio,
 } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 export interface NavbarProps {
-  /** Optional TikTok creator handle (e.g., @creator_name). Defaults to @tiktok_creator. */
+  /** Optional TikTok creator handle (e.g., @phuriphat_live). Defaults to @phuriphat_live. */
   username?: string;
-  /** isConnected: Whether the WebSocket (WS) connection to the ASGI server is active and verified. */
-  isConnected: boolean;
-  /** isReconnecting: Whether the client is currently performing exponential backoff reconnection. */
+  /** Whether the WebSocket (WS) connection to the ASGI server is active. */
+  isConnected?: boolean;
+  /** Whether the client is currently performing reconnection. */
   isReconnecting?: boolean;
-  /** backendUrl: Base backend URL for API and overlay endpoints. */
+  /** Base backend URL for API and overlay endpoints. */
   backendUrl?: string;
-  /** sessionId: Session UUID of active live stream. */
+  /** Session UUID of active live stream. */
   sessionId?: string;
-  /** overlayToken?: Security token for authenticating Open Broadcaster Software (OBS) browser source overlays. */
+  /** Security token for authenticating OBS browser source overlays. */
   overlayToken?: string;
-  /** Whether OBS overlay client is currently connected. */
+  /** Whether Open Broadcaster Software (OBS) client is connected. */
   obsConnected?: boolean;
-  /** Whether Google Colab Tesla T4 GPU backend is verified connected. */
-  colabConnected?: boolean;
-  /** Active voice synthesis engine name (e.g., fish-speech-v1.5, Edge-TTS). */
+  /** Master TTS switch state. */
+  masterTtsEnabled?: boolean;
+  /** Callback when Master TTS switch is toggled. */
+  onToggleMaster?: (enabled: boolean) => void;
+  /** Callback for Quick Voice Test button. */
+  onTestVoice?: () => void | Promise<any>;
+  /** Whether quick voice test is actively in progress. */
+  isTestingVoice?: boolean;
+  /** Active voice synthesis engine name. Defaults to Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ). */
   activeEngine?: string;
   /** Callback to open or toggle the Room Switcher / Session Start dialog. */
   onOpenRoomModal?: () => void;
@@ -63,35 +65,35 @@ export interface NavbarProps {
   onOpenOBSPreview?: () => void;
   /** Callback to toggle collapsible sidebar navigation state. */
   onToggleSidebar?: () => void;
+  /** Optional custom className */
+  className?: string;
 }
 
 export function Navbar({
-  username = "@tiktok_creator",
-  isConnected,
+  username = "phuriphat_live",
+  isConnected = false,
   isReconnecting = false,
   backendUrl = "",
   sessionId = "",
   overlayToken,
   obsConnected = false,
-  colabConnected = false,
-  activeEngine = "fish-speech-v1.5",
+  masterTtsEnabled = true,
+  onToggleMaster,
+  onTestVoice,
+  isTestingVoice = false,
+  activeEngine = "Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ)",
   onOpenRoomModal,
   onSwitchAccount,
   onOpenOBSPreview,
-  onToggleSidebar,
-}: NavbarProps) {
+  className = "",
+}: NavbarProps): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
-  const [searchQuery, setSearchQuery] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // Colab GPU engine determination
-  const isGPUActive =
-    colabConnected ||
-    (activeEngine &&
-      (activeEngine.toLowerCase().includes("fish") ||
-        activeEngine.toLowerCase().includes("colab")));
+  // Clean creator handle for display
+  const displayUser = username.replace(/^@/, "").trim() || "phuriphat_live";
 
-  // Fully qualified OBS overlay URL with URI-encoded parameters
+  // OBS Overlay URL calculation
   const cleanBackendUrl = (backendUrl || "").replace(/\/+$/, "");
   const encodedSessionId = encodeURIComponent(sessionId || "");
   const overlayUrl = overlayToken
@@ -110,206 +112,119 @@ export function Navbar({
     }
   };
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      console.log("Navbar Search dispatched:", searchQuery);
-    }
-  };
-
   return (
-    <header className="sticky top-0 z-50 w-full h-14 bg-white dark:bg-broadcast-dark border-b border-broadcast-border-light dark:border-broadcast-border-dark shadow-[0_1px_2px_rgba(0,0,0,0.1)] liquid-glass specular-border transition-colors duration-200">
-      <div className="h-full px-4 flex items-center justify-between gap-4 max-w-full">
-        {/* Left Section: Hamburger Menu & Red Studio Logo */}
-        <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="p-2 rounded-full hover:bg-broadcast-surface-light dark:hover:bg-broadcast-surface-dark text-neutral-700 dark:text-neutral-200 transition-colors focus:outline-none"
-            aria-label="Toggle navigation drawer"
-            title="สลับแถบเมนูด้านข้าง (Toggle Sidebar)"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-
+    <header
+      className={`sticky top-0 z-50 w-full bg-[#12141a]/95 backdrop-blur-md border-b border-[#1e222d] px-4 md:px-6 py-3 shadow-lg flex items-center justify-between gap-4 transition-colors ${className}`}
+      aria-label="TikFinity TTS Master Navigation Bar"
+    >
+      {/* Left Section: Brand Logo & Title */}
+      <div className="flex items-center gap-3 shrink-0">
+        <div
+          className="w-[38px] h-[38px] rounded-lg bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center font-extrabold text-black text-lg select-none shadow-md shrink-0"
+          title="TikFinity TTS Console"
+        >
+          TF
+        </div>
+        <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-broadcast-red flex items-center justify-center text-white shadow-sm">
-              <Play className="w-4 h-4 fill-white translate-x-0.5" />
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm tracking-tight text-neutral-900 dark:text-white">
-                  TTS Studio
-                </span>
-                <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-semibold">
-                  Live
-                </span>
-              </div>
-            </div>
+            <h1 className="font-bold text-sm sm:text-base tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
+              TikTok Live TTS Stream Console
+            </h1>
           </div>
+          <p className="text-[11px] text-slate-400 font-normal hidden sm:block">
+            TikFinity Cleansed Edition • 24/7 Cloud Powered
+          </p>
+        </div>
+      </div>
+
+      {/* Right Section: Badges, Controls, Master Switch */}
+      <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 flex-wrap justify-end">
+        {/* Live Badge with Pulsing Dot */}
+        <div
+          className="flex items-center gap-2 bg-[#fe2c55]/15 border border-[#fe2c55]/30 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#fe2c55] shadow-[0_0_12px_rgba(254,44,85,0.15)] cursor-pointer hover:bg-[#fe2c55]/20 transition-colors"
+          onClick={onSwitchAccount || onOpenRoomModal}
+          title={`TikTok Live: @${displayUser} (คลิกเพื่อเปลี่ยนห้อง)`}
+        >
+          <span className="w-2 h-2 rounded-full bg-[#fe2c55] animate-pulse shadow-[0_0_8px_#fe2c55]" />
+          <span className="truncate max-w-[140px] sm:max-w-[200px]">
+            LIVE: @{displayUser}
+          </span>
         </div>
 
-        {/* Center Section: 44px Search Input, 64px Search Button, and Circular Voice Mic */}
-        <div className="flex-1 max-w-2xl hidden md:flex items-center justify-center gap-2">
-          <form
-            onSubmit={handleSearchSubmit}
-            className="flex items-center w-full max-w-lg"
-          >
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ค้นหาบันทึกเสียง หรือประวัติแชท... (Search logs or chat)"
-                className="w-full h-[44px] px-4 rounded-l-full bg-white dark:bg-broadcast-dark text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 border border-r-0 border-broadcast-border-light dark:border-broadcast-border-dark focus:outline-none focus:border-broadcast-blue text-sm transition-colors"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-[64px] h-[44px] rounded-r-full bg-[#F8F8F8] dark:bg-[#222222] border border-broadcast-border-light dark:border-broadcast-border-dark flex items-center justify-center hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 transition-colors"
-              title="ค้นหา (Search)"
-            >
-              <Search className="w-4 h-4" />
-            </button>
-          </form>
-
-          <button
-            type="button"
-            className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 flex items-center justify-center transition-colors shrink-0"
-            title="ค้นหาด้วยเสียง (Voice Search)"
-          >
-            <Mic className="w-4 h-4" />
-          </button>
+        {/* Voice Engine Badge */}
+        <div
+          className="hidden md:flex items-center gap-1.5 bg-[#25f4ee]/10 border border-[#25f4ee]/25 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#25f4ee] shadow-sm"
+          title={`Active Voice Engine: ${activeEngine}`}
+        >
+          <span>🎙️</span>
+          <span className="truncate max-w-[220px]">{activeEngine}</span>
         </div>
 
-        {/* Right Section: Badges, Theme Toggle, Bell & User Avatar */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {/* Multi-System Real-Time Badges */}
-          <div className="hidden lg:flex items-center gap-2 text-xs">
-            {/* TikTok Live Stream Connection Badge */}
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-broadcast-border-light dark:border-broadcast-border-dark font-mono text-[11px]"
-              title={`TikTok Live: ${username}`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isConnected
-                    ? "bg-emerald-500 animate-pulse"
-                    : isReconnecting
-                    ? "bg-amber-500 animate-ping"
-                    : "bg-rose-500"
-                }`}
-              />
-              <span className="text-neutral-700 dark:text-neutral-300 font-medium">
-                {isConnected
-                  ? "Online (เชื่อมต่อแล้ว)"
-                  : isReconnecting
-                  ? "Reconnecting (กำลังเชื่อมต่อใหม่)"
-                  : "Disconnected (ขาดการเชื่อมต่อ)"}
-              </span>
-            </div>
-
-            {/* Google Colab Tesla T4 GPU Telemetry */}
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-broadcast-border-light dark:border-broadcast-border-dark font-mono text-[11px]"
-              title="สถานะระบบสังเคราะห์เสียง Colab Tesla T4 GPU"
-            >
-              <Zap
-                className={`w-3 h-3 ${
-                  isGPUActive ? "text-cyan-500" : "text-amber-500"
-                }`}
-              />
-              <span className="text-neutral-700 dark:text-neutral-300">
-                {isGPUActive ? "Colab GPU (T4)" : "Cloud Fallback"}
-              </span>
-            </div>
-
-            {/* OBS Studio Integration Badge */}
-            <div
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 border border-broadcast-border-light dark:border-broadcast-border-dark font-mono text-[11px]"
-              title="OBS Studio Browser Source"
-            >
-              <Tv
-                className={`w-3 h-3 ${
-                  obsConnected ? "text-emerald-500" : "text-neutral-400"
-                }`}
-              />
-              <span className="text-neutral-700 dark:text-neutral-300">
-                {obsConnected ? "OBS เชื่อมต่อแล้ว" : "OBS Studio"}
-              </span>
-            </div>
-
-            {/* OBS Overlay Quick Copy & Preview */}
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleCopyOverlay}
-                className="flex items-center gap-1 px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-broadcast-border-light dark:border-broadcast-border-dark text-neutral-700 dark:text-neutral-300 transition-colors"
-                title="คัดลอก OBS Overlay URL"
-              >
-                {copied ? (
-                  <Check className="w-3 h-3 text-emerald-500" />
-                ) : (
-                  <Copy className="w-3 h-3" />
-                )}
-                <span>{copied ? "คัดลอกแล้ว" : "Copy OBS Overlay URL"}</span>
-              </button>
-              <a
-                href={overlayUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (onOpenOBSPreview) {
-                    e.preventDefault();
-                    onOpenOBSPreview();
-                  }
-                }}
-                className="p-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 border border-broadcast-border-light dark:border-broadcast-border-dark text-neutral-600 dark:text-neutral-400 transition-colors"
-                title="Preview Overlay (ดูตัวอย่าง Overlay)"
-              >
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </div>
-
-          {/* Theme Mode Toggle (Sun/Moon calling toggleTheme()) */}
+        {/* Quick Voice Test Button */}
+        {onTestVoice && (
           <button
             type="button"
-            onClick={toggleTheme}
-            className="p-2 rounded-full hover:bg-broadcast-surface-light dark:hover:bg-broadcast-surface-dark text-neutral-700 dark:text-neutral-200 transition-colors"
-            title={theme === "dark" ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)" : "เปลี่ยนเป็นโหมดมืด (Dark Cinema Mode)"}
-            aria-label="Toggle application color scheme"
+            onClick={onTestVoice}
+            disabled={isTestingVoice}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] text-slate-200 hover:text-white transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-sm"
+            title="ทดสอบระบบเสียงสังเคราะห์ (Quick Voice Test)"
           >
-            {theme === "dark" ? (
-              <Sun className="w-5 h-5 text-amber-400" />
+            {isTestingVoice ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#25f4ee]" />
             ) : (
-              <Moon className="w-5 h-5 text-neutral-700" />
+              <Volume2 className="w-3.5 h-3.5 text-[#25f4ee]" />
             )}
+            <span className="hidden sm:inline">
+              {isTestingVoice ? "กำลังทดสอบ..." : "ทดสอบเสียง"}
+            </span>
           </button>
+        )}
 
-          {/* Notification Bell */}
-          <button
-            type="button"
-            className="relative p-2 rounded-full hover:bg-broadcast-surface-light dark:hover:bg-broadcast-surface-dark text-neutral-700 dark:text-neutral-200 transition-colors"
-            title="การแจ้งเตือน (Notifications)"
-            aria-label="View notifications"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-broadcast-red" />
-          </button>
-
-          {/* Creator Profile Avatar (32px Circle) */}
-          <button
-            type="button"
-            onClick={onSwitchAccount || onOpenRoomModal}
-            className="w-8 h-8 rounded-full bg-gradient-to-tr from-neutral-200 to-neutral-300 dark:from-neutral-700 dark:to-neutral-600 border border-broadcast-border-light dark:border-broadcast-border-dark flex items-center justify-center text-neutral-700 dark:text-white font-medium text-xs shadow-sm hover:ring-2 hover:ring-broadcast-blue/40 transition-all shrink-0"
-            title={`บัญชี: ${username} (คลิกเพื่อเปลี่ยนห้องหรือบัญชี)`}
-            aria-label="User profile and account settings"
-          >
-            <User className="w-4 h-4" />
-          </button>
+        {/* TTS Master Toggle Switch */}
+        <div className="flex items-center gap-2.5 bg-[#181b24] border border-[#1e222d] px-3 py-1.5 rounded-lg shadow-sm">
+          <span className="text-xs font-semibold text-slate-200 whitespace-nowrap select-none">
+            TTS Master
+          </span>
+          <label className="relative inline-flex items-center cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={masterTtsEnabled}
+              onChange={(e) => onToggleMaster?.(e.target.checked)}
+              className="sr-only peer"
+              aria-label="สวิตช์เปิด/ปิด TTS ทั้งหมด (Master TTS)"
+            />
+            <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00e676]" />
+          </label>
         </div>
+
+        {/* Theme Mode Toggle (Sun/Moon) */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="p-2 rounded-lg bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] text-slate-300 hover:text-white transition-colors"
+          title={theme === "dark" ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)" : "เปลี่ยนเป็นโหมดมืด (Dark Cinema Mode)"}
+          aria-label="Toggle theme color scheme"
+        >
+          {theme === "dark" ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-slate-300" />
+          )}
+        </button>
+
+        {/* Room Switcher / Creator Profile Avatar */}
+        <button
+          type="button"
+          onClick={onSwitchAccount || onOpenRoomModal}
+          className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-800 to-slate-700 border border-[#1e222d] flex items-center justify-center text-slate-200 hover:text-white font-medium text-xs shadow-sm hover:ring-2 hover:ring-[#25f4ee]/40 transition-all shrink-0"
+          title={`เปลี่ยนห้อง TikTok LIVE: @${displayUser}`}
+          aria-label="Change live stream room"
+        >
+          <User className="w-4 h-4" />
+        </button>
       </div>
     </header>
   );
 }
+
+export default Navbar;
