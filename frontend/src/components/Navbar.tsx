@@ -41,11 +41,12 @@ export function Navbar({
 }: NavbarProps) {
   const [copied, setCopied] = useState<boolean>(false);
 
-  // Construct fully qualified OBS overlay URL
+  // Construct fully qualified OBS overlay URL with URI-encoded parameters
   const cleanBackendUrl = (backendUrl || "").replace(/\/+$/, "");
+  const encodedSessionId = encodeURIComponent(sessionId || "");
   const overlayUrl = overlayToken
-    ? `${cleanBackendUrl}/overlay/${sessionId}?token=${encodeURIComponent(overlayToken)}`
-    : `${cleanBackendUrl}/overlay/${sessionId}`;
+    ? `${cleanBackendUrl}/overlay/${encodedSessionId}?token=${encodeURIComponent(overlayToken)}`
+    : `${cleanBackendUrl}/overlay/${encodedSessionId}`;
 
   const handleCopyOverlayUrl = async () => {
     try {

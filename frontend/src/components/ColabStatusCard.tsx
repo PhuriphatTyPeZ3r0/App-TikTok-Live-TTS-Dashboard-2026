@@ -42,11 +42,13 @@ export function ColabStatusCard({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  // Sync internal state if props change from WebSocket broadcasts
+  // Sync internal state if props change from WebSocket broadcasts when not actively editing
   React.useEffect(() => {
-    setTunnelUrlInput(colabSettings.colab_tunnel_url || "");
-    setPreferColab(colabSettings.prefer_colab_tts);
-  }, [colabSettings]);
+    if (!isEditing) {
+      setTunnelUrlInput(colabSettings.colab_tunnel_url || "");
+      setPreferColab(colabSettings.prefer_colab_tts);
+    }
+  }, [colabSettings, isEditing]);
 
   const hasActiveTunnel = Boolean(
     colabSettings.colab_tunnel_url && colabSettings.colab_tunnel_url.trim().length > 0

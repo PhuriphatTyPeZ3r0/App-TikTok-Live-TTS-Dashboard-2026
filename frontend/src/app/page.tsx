@@ -33,6 +33,7 @@ function BentoDashboardContent() {
   // Search parameter extraction with safe fallback defaults
   const sessionId = searchParams.get("sessionId") || searchParams.get("session_id") || "default_live_session";
   const adminToken = searchParams.get("token") || searchParams.get("adminToken") || "admin_secret";
+  const overlayToken = searchParams.get("overlayToken") || searchParams.get("overlay_token") || "";
   const defaultBackend = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:7860";
   const backendUrl = searchParams.get("backendUrl") || searchParams.get("backend_url") || defaultBackend;
   const username = searchParams.get("username") || "@tiktok_creator";
@@ -83,7 +84,7 @@ function BentoDashboardContent() {
         isReconnecting={isReconnecting}
         backendUrl={backendUrl}
         sessionId={sessionId}
-        overlayToken={adminToken}
+        overlayToken={overlayToken}
       />
 
       {/* Main Studio Bento Grid Layout */}
@@ -144,7 +145,10 @@ function BentoDashboardContent() {
             colabSettings={colabSettings}
             activeEngine={stats.active_engine}
             onUpdateSettings={async (settings) => {
-              await updateColabSettings(settings);
+              const ok = await updateColabSettings(settings);
+              if (!ok) {
+                throw new Error("Failed to update Colab tunnel configuration");
+              }
             }}
           />
         </div>

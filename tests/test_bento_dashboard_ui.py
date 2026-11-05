@@ -70,10 +70,11 @@ def test_navbar_component_contract():
     assert "Reconnecting" in content or "กำลังเชื่อมต่อใหม่" in content
     assert "Disconnected" in content or "ขาดการเชื่อมต่อ" in content
 
-    # OBS Overlay actions
+    # OBS Overlay actions & URI encoding
     assert "Copy OBS Overlay URL" in content or "คัดลอก OBS Overlay URL" in content or "overlay" in content.lower()
     assert "Preview Overlay" in content or "ดูตัวอย่าง Overlay" in content or "preview" in content.lower()
     assert "/overlay/" in content, "Must format overlay URL with /overlay/{sessionId}"
+    assert "encodeURIComponent" in content, "Must URI-encode sessionId and overlayToken in overlay URL"
 
 
 def test_control_panel_component_contract():
@@ -151,6 +152,10 @@ def test_colab_status_card_component_contract():
     assert "prefer_colab_tts" in content, "Must display or edit prefer_colab_tts toggle"
     assert "activeEngine" in content or "engine" in content.lower()
 
+    # Active editing guard in useEffect
+    assert "!isEditing" in content, "Must guard useEffect to prevent overwriting active user input during editing"
+    assert "isEditing" in content, "useEffect dependency array must include isEditing"
+
 
 def test_main_page_bento_grid_assembly():
     """Verify app/page.tsx integrates useDashboardSocket, AudioVisualizer, and bento components."""
@@ -172,6 +177,15 @@ def test_main_page_bento_grid_assembly():
 
     # Visualizer state binding
     assert "speakingItem" in content, "page.tsx must pass speakingItem or derived isSpeaking to AudioVisualizer"
+
+    # Security fix: Dedicated overlayToken extraction, NOT hardcoded to adminToken
+    assert "overlayToken" in content, "page.tsx must extract overlayToken query param"
+    assert "overlayToken={overlayToken}" in content, "page.tsx must pass dedicated overlayToken to Navbar (not adminToken)"
+    assert "overlayToken={adminToken}" not in content, "page.tsx must NOT hardcode overlayToken to adminToken"
+
+    # Robust Colab settings error propagation
+    assert "updateColabSettings" in content
+    assert "throw new Error" in content or "throw" in content, "onUpdateSettings must verify updateColabSettings success"
 
 
 def test_academic_rigor_and_attribution_mandate():
