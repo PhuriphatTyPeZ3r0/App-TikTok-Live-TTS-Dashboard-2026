@@ -23,8 +23,9 @@ COPY . .
 # Create audio cache directory
 RUN mkdir -p .cache/audio
 
-# Expose Hugging Face Spaces default HTTP port
+# Default HTTP port (7860 for Hugging Face Spaces, dynamically overridden by $PORT on Render / Cloud)
+ENV PORT=7860
 EXPOSE 7860
 
-# Launch Uvicorn ASGI server binding to all network interfaces
-CMD ["uvicorn", "src.web_server:app", "--host", "0.0.0.0", "--port", "7860"]
+# Launch Uvicorn ASGI server binding to all network interfaces with dynamic port support
+CMD ["sh", "-c", "uvicorn src.web_server:app --host 0.0.0.0 --port ${PORT:-7860}"]
