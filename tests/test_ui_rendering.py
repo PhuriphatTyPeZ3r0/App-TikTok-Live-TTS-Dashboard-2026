@@ -99,3 +99,23 @@ def test_dashboard_page_nonexistent_session(client: TestClient) -> None:
     """Test GET /dashboard/{session_id} with non-existent session returns HTTP 404 Not Found."""
     response = client.get("/dashboard/non-existent-uuid-99999?token=some_token")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_landing_page_redirect_to_vercel(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test GET / redirects with HTTP 307 to Vercel Frontend when RENDER=true."""
+    monkeypatch.setenv("RENDER", "true")
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == status.HTTP_307_TEMPORARY_REDIRECT
+    assert "tiktok-live-tts-dashboard.vercel.app" in response.headers["location"]
+
+
+def test_get_active_session_api(client: TestClient, test_session: SessionInstance) -> None:
+    """Test GET /api/sessions/active returns current active session metadata for decoupled frontend."""
+    response = client.get("/api/sessions/active")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["has_active_session"] is True
+    assert data["session_id"] == test_session.session_id
+    assert data["tiktok_username"] == test_session.tiktok_username
+    assert data["overlay_token"] == test_session.overlay_token
+

@@ -9,6 +9,7 @@ queue purges (CONTROL_FLUSH), health probes, and test speech synthesis injection
 import asyncio
 from contextlib import asynccontextmanager
 import logging
+import os
 from pathlib import Path
 import secrets
 from typing import Any, Dict, List, Optional
@@ -16,7 +17,7 @@ import urllib.parse
 
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -180,19 +181,94 @@ class StartSessionRequest(BaseModel):
 
 
 # ==============================================================================
-# HTML Template User Interface (UI) Endpoints
+# HTML Template User Interface (UI) Endpoints & Decoupled Frontend Redirects
 # ==============================================================================
 
+FRONTEND_DASHBOARD_URL = os.getenv("FRONTEND_DASHBOARD_URL", "https://tiktok-live-tts-dashboard.vercel.app")
+
+
+@app.get("/api/sessions/active", response_model=Dict[str, Any])
+async def get_active_session_info(request: Request) -> Dict[str, Any]:
+    """Retrieve metadata about the currently active or default creator session.
+
+    Enables zero-configuration auto-discovery from the decoupled Vercel Frontend Dashboard.
+    """
+    default_session = getattr(request.app.state, "default_session", None)
+    if default_session is None:
+        all_sessions = session_manager.get_all_sessions()
+        if all_sessions:
+            default_session = all_sessions[0]
+
+    if default_session is None:
+        return {
+            "has_active_session": False,
+            "session_id": None,
+            "tiktok_username": None,
+            "is_running": False,
+            "overlay_token": None,
+            "admin_token": None,
+        }
+
+    is_running = getattr(default_session, "is_running", False)
+    if callable(is_running):
+        is_running = is_running()
+
+    return {
+        "has_active_session": True,
+        "session_id": default_session.session_id,
+        "tiktok_username": default_session.tiktok_username,
+        "is_running": is_running,
+        "overlay_token": default_session.overlay_token,
+        "admin_token": default_session.admin_token,
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
-async def get_index_page(request: Request) -> HTMLResponse:
-    """Render landing page for session creation and creator onboarding.
+async def get_index_page(
+    request: Request,
+    redirect: Optional[bool] = Query(None, description="Whether to redirect automatically to Vercel Frontend Dashboard."),
+):
+    """Render landing page or automatically redirect to dedicated Vercel Frontend Dashboard.
+
+    In production environments (e.g. Render where RENDER=true or FRONTEND_REDIRECT=true),
+    issues HTTP 307 Temporary Redirect to the Vercel Single-Page Application (SPA) dashboard.
 
     Args:
         request: FastAPI Request instance.
+        redirect: Optional boolean override to force or bypass redirection.
 
     Returns:
-        Rendered HTML response for templates/index.html.
+        Rendered HTML response or RedirectResponse to Vercel.
     """
+    is_render_env = os.getenv("RENDER", "").lower() == "true" or os.getenv("FRONTEND_REDIRECT", "").lower() == "true"
+    should_redirect = redirect if redirect is not None else is_render_env
+
+    if should_redirect:
+        base_dashboard = FRONTEND_DASHBOARD_URL.rstrip("/")
+        default_session = getattr(request.app.state, "default_session", None)
+        if default_session is None:
+            all_sessions = session_manager.get_all_sessions()
+            if all_sessions:
+                default_session = all_sessions[0]
+
+        base_backend = str(request.base_url).rstrip("/")
+        if default_session:
+            params = {
+                "sessionId": default_session.session_id,
+                "adminToken": default_session.admin_token,
+                "overlayToken": default_session.overlay_token,
+                "username": default_session.tiktok_username,
+                "backendUrl": base_backend,
+            }
+            redirect_url = f"{base_dashboard}?{urllib.parse.urlencode(params)}"
+        else:
+            redirect_url = f"{base_dashboard}?backendUrl={urllib.parse.quote(base_backend)}"
+
+        return RedirectResponse(
+            url=redirect_url,
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+        )
+
     return templates.TemplateResponse(
         request=request,
         name="index.html",
@@ -251,8 +327,9 @@ async def get_dashboard_page(
     request: Request,
     session_id: str,
     token: str = Query(..., description="Streamer admin security token."),
-) -> HTMLResponse:
-    """Render streamer control dashboard with live feed and emergency controls.
+    redirect: Optional[bool] = Query(None, description="Whether to redirect automatically to Vercel Frontend Dashboard."),
+):
+    """Render streamer control dashboard or redirect to dedicated Vercel Frontend Dashboard.
 
     Requires valid admin token matching the active session.
 
@@ -260,13 +337,14 @@ async def get_dashboard_page(
         request: FastAPI Request instance.
         session_id: Target session Universally Unique Identifier (UUID).
         token: Streamer admin security token.
+        redirect: Optional boolean override to force or bypass redirection.
 
     Raises:
         HTTPException 404: If the session does not exist.
         HTTPException 403: If the token does not match session admin token.
 
     Returns:
-        Rendered HTML response for templates/dashboard.html.
+        Rendered HTML response or RedirectResponse to Vercel.
     """
     session = session_manager.get_session(session_id)
     if session is None:
@@ -282,6 +360,25 @@ async def get_dashboard_page(
         )
 
     session.touch()
+
+    is_render_env = os.getenv("RENDER", "").lower() == "true" or os.getenv("FRONTEND_REDIRECT", "").lower() == "true"
+    should_redirect = redirect if redirect is not None else is_render_env
+
+    if should_redirect:
+        base_dashboard = FRONTEND_DASHBOARD_URL.rstrip("/")
+        base_backend = str(request.base_url).rstrip("/")
+        params = {
+            "sessionId": session.session_id,
+            "adminToken": token,
+            "overlayToken": session.overlay_token,
+            "username": session.tiktok_username,
+            "backendUrl": base_backend,
+        }
+        redirect_url = f"{base_dashboard}?{urllib.parse.urlencode(params)}"
+        return RedirectResponse(
+            url=redirect_url,
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+        )
     app_config: Optional[AppConfig] = getattr(request.app.state, "config", None)
     return templates.TemplateResponse(
         request=request,

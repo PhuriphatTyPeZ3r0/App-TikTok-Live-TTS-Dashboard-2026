@@ -38,6 +38,13 @@ cloudflare-gateway/.wrangler/
 # Superpowers execution directory
 .superpowers/
 
+# Node.js and Next.js artifacts
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+frontend/next-env.d.ts
+
 # Shipped assets (the gift chime and voice prompts) are tracked despite the audio rules above
 !assets/*.wav
 !colab/assets/*.mp3

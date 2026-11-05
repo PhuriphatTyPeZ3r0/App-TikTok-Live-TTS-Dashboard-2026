@@ -3,17 +3,15 @@
 /**
  * Apple visionOS Frosted Liquid Glass Navigation Bar Component for Next.js 15.
  *
- * Provides real-time connection status monitoring, creator identity branding,
- * and Open Broadcaster Software (OBS) browser source overlay Uniform Resource Identifier (URI) distribution.
- * Integrates directly with the FastAPI Asynchronous Server Gateway Interface (ASGI) server,
- * serving the Single-Page Application (SPA) dashboard while synchronizing with the
- * Web Audio Application Programming Interface (Web Audio API) pipeline and First-In, First-Out (FIFO) queue states.
+ * Single-Page Application (SPA) navigation and multi-system telemetry component communicating
+ * with the FastAPI Asynchronous Server Gateway Interface (ASGI) server, coordinating with
+ * the Web Audio Application Programming Interface (Web Audio API) and First-In, First-Out (FIFO) queue states.
  *
- * Voice actor attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  */
 
 import React, { useState } from "react";
-import { Mic, Copy, Check, ExternalLink, Radio, Sparkles } from "lucide-react";
+import { Mic, Sparkles, Zap, Tv, UserCheck, RefreshCw, Copy, Check, ExternalLink } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export interface NavbarProps {
@@ -23,12 +21,18 @@ export interface NavbarProps {
   isConnected: boolean;
   /** Whether the client is currently performing exponential backoff reconnection. */
   isReconnecting: boolean;
-  /** Base Hypertext Transfer Protocol (HTTP/HTTPS) backend URL. */
+  /** Base backend URL. */
   backendUrl: string;
-  /** Session Universally Unique Identifier (UUID) of the active live streaming session. */
+  /** Session UUID of active live stream. */
   sessionId: string;
   /** Security token for authenticating Open Broadcaster Software (OBS) browser source overlays. */
   overlayToken?: string;
+  /** Whether OBS overlay client is currently connected. */
+  obsConnected?: boolean;
+  /** Active voice synthesis engine name (e.g., fish-speech-v1.5, Edge-TTS). */
+  activeEngine?: string;
+  /** Callback to open or toggle the Room Switcher / Session Start dialog. */
+  onOpenRoomModal?: () => void;
 }
 
 export function Navbar({
@@ -38,17 +42,21 @@ export function Navbar({
   backendUrl,
   sessionId,
   overlayToken,
+  obsConnected = false,
+  activeEngine = "fish-speech-v1.5",
+  onOpenRoomModal,
 }: NavbarProps) {
   const [copied, setCopied] = useState<boolean>(false);
+  const isGPUActive = activeEngine.toLowerCase().includes("fish") || activeEngine.toLowerCase().includes("colab");
 
-  // Construct fully qualified OBS overlay URL with URI-encoded parameters
+  // Fully qualified OBS overlay URL with URI-encoded parameters
   const cleanBackendUrl = (backendUrl || "").replace(/\/+$/, "");
   const encodedSessionId = encodeURIComponent(sessionId || "");
   const overlayUrl = overlayToken
     ? `${cleanBackendUrl}/overlay/${encodedSessionId}?token=${encodeURIComponent(overlayToken)}`
     : `${cleanBackendUrl}/overlay/${encodedSessionId}`;
 
-  const handleCopyOverlayUrl = async () => {
+  const handleCopyOverlay = async () => {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
         await navigator.clipboard.writeText(overlayUrl);
@@ -62,10 +70,10 @@ export function Navbar({
 
   return (
     <header className="w-full liquid-glass specular-border rounded-2xl px-5 py-3.5 mb-6 shadow-xl backdrop-blur-2xl transition-all duration-300">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* Creator Identity & Studio Branding */}
-        <div className="flex items-center gap-3.5">
-          <div className="relative flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-tr from-[#fe2c55]/30 to-[#00f2fe]/30 border border-white/20 shadow-inner">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-3.5">
+        {/* Studio Branding & Voice Attribution */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-tr from-[#fe2c55]/30 to-[#00f2fe]/30 border border-white/20 shadow-inner">
             <Mic className="w-5 h-5 text-white drop-shadow-md" />
             <motion.div
               animate={{ rotate: 360 }}
@@ -77,104 +85,84 @@ export function Navbar({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold tracking-wide text-white drop-shadow">
+              <h1 className="text-base font-bold tracking-wide text-white drop-shadow">
                 TikTok Live TTS Studio
               </h1>
               <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
-                v2.0 Liquid Glass
+                v2.0 Cockpit
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-white/60">
-              <span className="font-medium text-white/80">{username}</span>
-              <span>•</span>
-              <span className="text-[11px] text-cyan-200/70 font-light">
-                เสียงพากย์: พิพัฒน์ บุญสิทธิเลิศ
-              </span>
+            <div className="text-[11px] text-cyan-200/80 font-light flex items-center gap-1.5">
+              <span>เสียงพากย์:</span>
+              <strong className="text-white/90 font-medium">พิพัฒน์ บุญสิทธิเลิศ</strong>
+              <span className="text-white/40">({username})</span>
+              <span className="text-white/30">•</span>
+              <span className="text-white/50 font-mono text-[10px]">Tesla T4 FP16</span>
             </div>
           </div>
         </div>
 
-        {/* Center: Real-time Connection Status Pill */}
-        <div className="flex items-center">
-          <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-black/40 border border-white/10 shadow-inner">
-            {isConnected ? (
-              <>
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
-                </span>
-                <span className="text-xs font-medium text-emerald-400 tracking-wide">
-                  Online (เชื่อมต่อแล้ว)
-                </span>
-              </>
-            ) : isReconnecting ? (
-              <>
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.8)]"></span>
-                </span>
-                <span className="text-xs font-medium text-amber-300 tracking-wide">
-                  Reconnecting... (กำลังเชื่อมต่อใหม่)
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]"></span>
-                </span>
-                <span className="text-xs font-medium text-rose-400 tracking-wide">
-                  Disconnected (ขาดการเชื่อมต่อ)
-                </span>
-              </>
-            )}
+        {/* Multi-System Real-time Health Telemetry Badges & Overlay Tools */}
+        <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+          {/* TikTok Ingestion Status */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10 font-mono">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                isConnected
+                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"
+                  : isReconnecting
+                  ? "bg-amber-400 animate-ping"
+                  : "bg-rose-400"
+              }`}
+            />
+            <span className={isConnected ? "text-emerald-300 font-medium" : isReconnecting ? "text-amber-300" : "text-rose-300"}>
+              {isConnected ? "Online (เชื่อมต่อแล้ว)" : isReconnecting ? "Reconnecting (กำลังเชื่อมต่อใหม่)" : "Disconnected (ขาดการเชื่อมต่อ)"}
+            </span>
           </div>
-        </div>
 
-        {/* Right: Quick Action Buttons (OBS Overlay URL distribution) */}
-        <div className="flex items-center gap-2.5">
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={handleCopyOverlayUrl}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-medium rounded-xl bg-white/10 hover:bg-white/15 border border-white/20 text-white shadow-sm transition-colors duration-150 backdrop-blur-md"
-            title="Copy OBS Overlay URL to clipboard"
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {copied ? (
-                <motion.span
-                  key="check"
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.5, opacity: 0 }}
-                  className="flex items-center gap-1.5 text-emerald-400"
-                >
-                  <Check className="w-4 h-4" />
-                  <span>คัดลอกแล้ว!</span>
-                </motion.span>
-              ) : (
-                <motion.span
-                  key="copy"
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.5, opacity: 0 }}
-                  className="flex items-center gap-1.5"
-                >
-                  <Copy className="w-4 h-4 text-cyan-300" />
-                  <span>Copy OBS Overlay URL</span>
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </motion.button>
+          {/* AI Voice Engine Status */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/40 border border-white/10 font-mono">
+            <Zap className={`w-3 h-3 ${isGPUActive ? "text-cyan-400" : "text-amber-400"}`} />
+            <span className={isGPUActive ? "text-cyan-300" : "text-amber-200"}>
+              {isGPUActive ? "Colab GPU (T4)" : "Cloud Fallback"}
+            </span>
+          </div>
 
-          <a
-            href={overlayUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-xl bg-[#00f2fe]/10 hover:bg-[#00f2fe]/20 border border-[#00f2fe]/30 text-cyan-300 shadow-sm transition-colors duration-150 backdrop-blur-md"
-            title="Preview Overlay in new tab"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Preview Overlay</span>
-          </a>
+          {/* OBS Overlay Quick Copy & Preview Link */}
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleCopyOverlay}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white/90 text-xs font-medium transition-all active:scale-95"
+              title="คัดลอก OBS Overlay URL"
+            >
+              {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-cyan-300" />}
+              <span>{copied ? "คัดลอกแล้ว" : "Copy OBS Overlay URL"}</span>
+            </button>
+            <a
+              href={overlayUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white/80 transition-all"
+              title="Preview Overlay (ดูตัวอย่าง Overlay)"
+            >
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          {/* Active Creator Handle & Change Room Button */}
+          {onOpenRoomModal && (
+            <button
+              type="button"
+              onClick={onOpenRoomModal}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-400/30 text-white text-xs font-medium transition-all active:scale-95"
+              title="เปลี่ยนห้อง TikTok Live หรือเริ่มสตรีมใหม่"
+            >
+              <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-semibold text-cyan-200">{username}</span>
+              <RefreshCw className="w-3 h-3 text-white/50 ml-0.5" />
+            </button>
+          )}
         </div>
       </div>
     </header>

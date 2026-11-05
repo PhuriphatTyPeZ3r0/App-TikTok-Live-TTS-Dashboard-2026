@@ -3,18 +3,24 @@
 /**
  * Apple visionOS Frosted Liquid Glass Queue Feed Component for Next.js 15.
  *
- * Displays the real-time First-In, First-Out (FIFO) speech synthesis message queue,
- * highlighting actively playing speech synthesis with glowing cyan indicators,
- * elevating VIP Gift events with golden glass badges, and offering individual item discard actions.
- * Integrates into Single-Page Application (SPA) dashboard communicating with FastAPI
- * Asynchronous Server Gateway Interface (ASGI) backend server and coordinating with
- * the Web Audio Application Programming Interface (Web Audio API).
+ * Single-Page Application (SPA) queue visualizer communicating with FastAPI
+ * Asynchronous Server Gateway Interface (ASGI) server, coordinating with
+ * the Web Audio Application Programming Interface (Web Audio API) and First-In, First-Out (FIFO) queue.
  *
- * Voice actor attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  */
 
-import React from "react";
-import { MessageSquare, Gift, Volume2, Trash2, ListOrdered, Sparkles, Gem } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import {
+  MessageSquare,
+  Gift,
+  Volume2,
+  Trash2,
+  ListOrdered,
+  Sparkles,
+  Gem,
+  SkipForward,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { QueueItem, SpeakingItem } from "../types/dashboard";
 
@@ -25,50 +31,122 @@ export interface QueueFeedProps {
   speakingItem: SpeakingItem | null;
   /** Callback to skip or discard a specific item from the queue by its unique ID. */
   onSkipItem?: (id: string) => void;
+  /** Callback to purge the entire pending queue. */
+  onClearQueue?: () => void;
 }
 
 export function QueueFeed({
   queue,
   speakingItem,
   onSkipItem,
+  onClearQueue,
 }: QueueFeedProps) {
+  const [filter, setFilter] = useState<"all" | "gifts" | "comments">("all");
+
+  const giftsCount = useMemo(
+    () => queue.filter((i) => Boolean(i.is_gift)).length,
+    [queue]
+  );
+  const commentsCount = useMemo(
+    () => queue.filter((i) => !i.is_gift).length,
+    [queue]
+  );
+
+  const filteredQueue = useMemo(() => {
+    if (filter === "gifts") {
+      return queue.filter((i) => Boolean(i.is_gift));
+    }
+    if (filter === "comments") {
+      return queue.filter((i) => !i.is_gift);
+    }
+    return queue;
+  }, [queue, filter]);
+
   return (
     <div className="flex flex-col h-full liquid-glass specular-border rounded-2xl p-5 shadow-2xl backdrop-blur-2xl transition-all duration-300">
-      {/* Feed Header */}
-      <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+      {/* Feed Header & Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-white/10 gap-3 mb-4">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-xl bg-white/10 border border-white/10 text-cyan-300">
             <ListOrdered className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-base font-semibold tracking-wide text-white">
+            <h2 className="text-sm font-semibold tracking-wide text-white flex items-center gap-2">
               คิวเสียงพูด (Speech Queue)
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+                {queue.length} ในคิว
+              </span>
             </h2>
-            <p className="text-xs text-white/50">
-              ลำดับการสังเคราะห์เสียงแบบ First-In, First-Out (FIFO)
+            <p className="text-[11px] text-white/50">
+              ข้อความสดจาก TikTok Live เรียงลำดับตาม First-In, First-Out (FIFO)
             </p>
           </div>
         </div>
 
-        {/* Queue Count Badge */}
-        <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-white/10 border border-white/15 text-white/80">
-          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-          <span>{queue.length} รายการ</span>
-        </span>
+        {/* Clear Queue Button */}
+        {queue.length > 0 && onClearQueue && (
+          <button
+            type="button"
+            onClick={onClearQueue}
+            className="self-end sm:self-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-rose-300 hover:text-rose-100 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all active:scale-95"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>ล้างคิวทั้งหมด</span>
+          </button>
+        )}
       </div>
 
-      {/* Now Speaking Banner (Active TTS Item) */}
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-1.5 mb-3.5 bg-black/40 p-1 rounded-xl border border-white/10 text-xs">
+        <button
+          type="button"
+          onClick={() => setFilter("all")}
+          className={`flex-1 py-1 px-2.5 rounded-lg font-medium transition-all ${
+            filter === "all"
+              ? "bg-white/15 text-white shadow-sm border border-white/10"
+              : "text-white/50 hover:text-white/80"
+          }`}
+        >
+          ทั้งหมด ({queue.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter("gifts")}
+          className={`flex-1 py-1 px-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1 ${
+            filter === "gifts"
+              ? "bg-amber-500/20 text-amber-300 shadow-sm border border-amber-400/30"
+              : "text-white/50 hover:text-amber-200"
+          }`}
+        >
+          <Gift className="w-3 h-3 text-amber-400" />
+          <span>ของขวัญ ({giftsCount})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilter("comments")}
+          className={`flex-1 py-1 px-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1 ${
+            filter === "comments"
+              ? "bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-400/30"
+              : "text-white/50 hover:text-cyan-200"
+          }`}
+        >
+          <MessageSquare className="w-3 h-3 text-cyan-400" />
+          <span>แชท ({commentsCount})</span>
+        </button>
+      </div>
+
+      {/* Now Speaking Hero Spotlight */}
       <AnimatePresence mode="wait">
         {speakingItem && (
           <motion.div
             key={speakingItem.id || "speaking-banner"}
-            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            initial={{ opacity: 0, y: -8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.2 }}
-            className="mb-4 p-4 rounded-xl bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-transparent border border-cyan-400/40 shadow-[0_0_20px_rgba(0,242,254,0.15)] relative overflow-hidden"
+            className="mb-4 p-4 rounded-xl bg-gradient-to-r from-cyan-500/20 via-blue-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_25px_rgba(0,242,254,0.2)] relative overflow-hidden"
           >
-            <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2.5 w-2.5">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
@@ -76,18 +154,43 @@ export function QueueFeed({
                 </span>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1">
                   <Volume2 className="w-3.5 h-3.5 animate-bounce" />
-                  กำลังพูด (Now Speaking)
+                  กำลังพูดสด (Now Speaking)
                 </span>
               </div>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
-                {speakingItem.engine || "Edge-TTS"}
-              </span>
+
+              {/* Sound Wave Bars Simulation */}
+              <div className="flex items-center gap-1 h-3.5">
+                {[40, 90, 60, 100, 75, 45].map((h, i) => (
+                  <motion.div
+                    key={i}
+                    animate={{ height: [`${h * 0.3}%`, `${h}%`, `${h * 0.4}%`] }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 0.6 + i * 0.1,
+                      ease: "easeInOut",
+                    }}
+                    className="w-0.5 rounded-full bg-cyan-400 shadow-[0_0_4px_rgba(0,242,254,0.8)]"
+                  />
+                ))}
+              </div>
             </div>
 
-            <div className="text-sm font-semibold text-white drop-shadow">
-              {speakingItem.user}
+            <div className="text-sm font-semibold text-white flex items-center justify-between">
+              <span>{speakingItem.user}</span>
+              {onSkipItem && (
+                <button
+                  type="button"
+                  onClick={() => onSkipItem(speakingItem.id)}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-white/70 hover:text-white bg-white/10 hover:bg-white/20 transition-all"
+                  title="ข้ามเสียงนี้"
+                >
+                  <SkipForward className="w-3 h-3" />
+                  <span>ข้าม</span>
+                </button>
+              )}
             </div>
-            <div className="text-xs text-white/90 mt-1 line-clamp-2 leading-relaxed font-light">
+
+            <div className="text-xs text-white/95 mt-1 leading-relaxed font-light line-clamp-2">
               &ldquo;{speakingItem.text}&rdquo;
             </div>
           </motion.div>
@@ -95,94 +198,82 @@ export function QueueFeed({
       </AnimatePresence>
 
       {/* Scrollable Queue Item List */}
-      <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-[220px] max-h-[380px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-[260px] max-h-[480px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
         <AnimatePresence initial={false}>
-          {queue.length === 0 ? (
+          {filteredQueue.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center h-full min-h-[200px] text-center p-6 border border-dashed border-white/10 rounded-xl bg-white/[0.01]"
+              className="flex flex-col items-center justify-center h-48 rounded-xl border border-dashed border-white/10 text-center p-6 text-white/40"
             >
-              <div className="p-3 rounded-full bg-white/5 border border-white/10 text-white/30 mb-2">
-                <Sparkles className="w-5 h-5" />
-              </div>
-              <p className="text-sm font-medium text-white/60">
+              <Sparkles className="w-8 h-8 text-white/20 mb-2" />
+              <p className="text-xs font-medium text-white/60">
                 ไม่มีคิวข้อความรออ่าน (Queue is idle)
               </p>
-              <p className="text-xs text-white/40 mt-1">
-                ระบบพร้อมสังเคราะห์เสียงทันทีเมื่อมีผู้ส่งคอมเมนต์หรือของขวัญ
+              <p className="text-[11px] text-white/30 mt-1">
+                เมื่อมีผู้ชมส่งคอมเมนต์หรือของขวัญ ระบบจะนำมาเรียงอ่านที่นี่โดยอัตโนมัติ
               </p>
             </motion.div>
           ) : (
-            queue.map((item, index) => {
-              const isVipGift = item.is_gift || item.priority;
+            filteredQueue.map((item, index) => {
+              const isGift = Boolean(item.is_gift);
 
               return (
                 <motion.div
                   key={item.id || `queue-item-${index}`}
-                  layout
-                  initial={{ opacity: 0, x: 20 }}
+                  initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  className={`flex items-start justify-between gap-3 p-3.5 rounded-xl border transition-all duration-200 ${
-                    isVipGift
-                      ? "bg-amber-500/10 hover:bg-amber-500/15 border-amber-400/40 shadow-[0_0_12px_rgba(245,158,11,0.1)]"
-                      : "bg-white/[0.03] hover:bg-white/[0.06] border-white/10"
+                  exit={{ opacity: 0, x: 10 }}
+                  transition={{ duration: 0.15 }}
+                  className={`p-3 rounded-xl border flex items-start justify-between gap-3 transition-all ${
+                    isGift
+                      ? "bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-amber-400/40 shadow-[0_0_15px_rgba(251,191,36,0.1)]"
+                      : "bg-white/[0.04] border-white/10 hover:border-white/20"
                   }`}
                 >
-                  <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                    {/* Event Type Icon */}
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
                     <div
-                      className={`p-1.5 rounded-lg mt-0.5 ${
-                        isVipGift
-                          ? "bg-amber-400/20 text-amber-300 border border-amber-400/30"
-                          : "bg-white/10 text-cyan-300 border border-white/10"
+                      className={`p-1.5 rounded-lg border mt-0.5 shrink-0 ${
+                        isGift
+                          ? "bg-amber-500/20 border-amber-400/40 text-amber-300 shadow-sm"
+                          : "bg-white/10 border-white/10 text-cyan-300"
                       }`}
                     >
-                      {isVipGift ? (
-                        <Gift className="w-4 h-4" />
-                      ) : (
-                        <MessageSquare className="w-4 h-4" />
-                      )}
+                      {isGift ? <Gem className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
                     </div>
 
-                    {/* Sender and Message Body */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-white truncate">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-white/90 truncate">
                           {item.user}
                         </span>
-
-                        {/* VIP Gift Badge & Diamonds */}
-                        {isVipGift && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-400/20 text-amber-200 border border-amber-400/30">
-                            <Gem className="w-2.5 h-2.5 text-amber-300" />
-                            <span>
-                              {item.gift_name ? `${item.gift_name} ` : "VIP Gift "}
-                              {item.diamonds ? `(${item.diamonds} diamonds)` : ""}
-                            </span>
+                        {isGift && (
+                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 shrink-0">
+                            {item.gift_name ? `🎁 ${item.gift_name}` : "VIP Gift"}
+                            {item.diamonds ? ` (${item.diamonds} diamonds)` : ""}
                           </span>
                         )}
+                        <span className="text-[10px] text-white/30 font-mono shrink-0 ml-auto">
+                          #{index + 1}
+                        </span>
                       </div>
 
-                      <p className="text-xs text-white/80 mt-1 line-clamp-2 font-light leading-relaxed">
+                      <div className="text-xs text-white/75 mt-0.5 break-words line-clamp-2 leading-relaxed">
                         {item.text}
-                      </p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Skip / Trash Action Button */}
                   {onSkipItem && (
-                    <motion.button
-                      whileTap={{ scale: 0.9 }}
+                    <button
+                      type="button"
                       onClick={() => onSkipItem(item.id)}
-                      className="p-1.5 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors"
-                      title="Skip / Discard queue item"
+                      className="p-1 rounded-md text-white/30 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0 mt-0.5"
+                      title="ลบออกจากคิว"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                    </motion.button>
+                    </button>
                   )}
                 </motion.div>
               );
