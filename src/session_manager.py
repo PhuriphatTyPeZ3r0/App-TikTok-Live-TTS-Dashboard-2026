@@ -100,7 +100,7 @@ class SessionInstance:
 
     async def stop(self) -> None:
         """Gracefully terminate the live stream session and underlying ingestion service."""
-        if not self._is_running:
+        if not self.is_running:
             return
         self._is_running = False
         self.touch()

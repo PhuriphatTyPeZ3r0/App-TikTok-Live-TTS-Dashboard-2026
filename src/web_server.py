@@ -49,6 +49,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         app.state.config = AppConfig(tiktok_username="", fish_audio_api_key="")
 
+    # Maintain strong references to background asyncio tasks to prevent premature garbage collection
+    if not hasattr(app.state, "_background_tasks"):
+        app.state._background_tasks = set()
+
     # 2. If app.state.tts_engine is not yet set, initialize default TTSEngine
     if getattr(app.state, "tts_engine", None) is None:
         try:
@@ -58,7 +62,7 @@ async def lifespan(app: FastAPI):
 
     # 3. If app.state.config.tiktok_username is non-empty (stripped): auto-bootstrap default session
     config: Optional[AppConfig] = getattr(app.state, "config", None)
-    creator_username = config.tiktok_username.strip() if config and config.tiktok_username else ""
+    creator_username = config.tiktok_username.strip() if config and getattr(config, "tiktok_username", None) else ""
     if creator_username:
         default_session = getattr(app.state, "default_session", None)
         if default_session is None:
@@ -69,25 +73,29 @@ async def lifespan(app: FastAPI):
 
         if default_session is None:
             default_session = session_manager.create_session(
-                tiktok_username=config.tiktok_username,
-                fish_audio_api_key=config.fish_audio_api_key,
+                tiktok_username=creator_username,
+                fish_audio_api_key=getattr(config, "fish_audio_api_key", ""),
                 user_cooldown=getattr(config, "user_cooldown_seconds", 5),
                 max_comment_length=getattr(config, "max_comment_length", 80),
-                colab_tunnel_url=config.colab_tunnel_url,
-                prefer_colab_tts=config.prefer_colab_tts,
-                colab_tts_timeout_seconds=config.colab_tts_timeout_seconds,
-                hf_token=config.hf_token,
+                colab_tunnel_url=getattr(config, "colab_tunnel_url", None),
+                prefer_colab_tts=getattr(config, "prefer_colab_tts", True),
+                colab_tts_timeout_seconds=getattr(config, "colab_tts_timeout_seconds", 5.0),
+                hf_token=getattr(config, "hf_token", None),
             )
 
         app.state.default_session = default_session
-        asyncio.create_task(default_session.start())
-        logger.info("Automated session auto-bootstrapping initiated for TikTok creator: %s", config.tiktok_username)
+        start_task = asyncio.create_task(default_session.start())
+        app.state._background_tasks.add(start_task)
+        start_task.add_done_callback(app.state._background_tasks.discard)
+        logger.info("Automated session auto-bootstrapping initiated for TikTok creator: %s", creator_username)
 
     # 4. If app.state.tts_engine and app.state.config.colab_tunnel_url: dispatch pre-warming ping
     tts_engine = getattr(app.state, "tts_engine", None)
     if tts_engine and config and getattr(config, "colab_tunnel_url", None):
-        asyncio.create_task(tts_engine.warm_remote_engine())
-        logger.info("Dispatched asynchronous pre-warming ping for remote ZeroGPU / Colab endpoint: %s", config.colab_tunnel_url)
+        warm_task = asyncio.create_task(tts_engine.warm_remote_engine())
+        app.state._background_tasks.add(warm_task)
+        warm_task.add_done_callback(app.state._background_tasks.discard)
+        logger.info("Dispatched asynchronous pre-warming ping for remote ZeroGPU / Colab endpoint: %s", getattr(config, "colab_tunnel_url", None))
 
     yield
 
