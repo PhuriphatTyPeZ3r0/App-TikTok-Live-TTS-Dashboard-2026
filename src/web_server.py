@@ -1,0 +1,735 @@
+"""FastAPI Web Server & REST Application Programming Interface (API) Router.
+
+This module provides the central web application layer for the TikTok Live Text-to-Speech (TTS)
+Cloud Web Platform. It handles multi-tenant session creation, dual token-based authorization
+(Open Broadcaster Software (OBS) Studio overlay vs streamer control dashboard), emergency
+queue purges (CONTROL_FLUSH), health probes, and test speech synthesis injection.
+"""
+
+import logging
+from pathlib import Path
+import secrets
+from typing import Any, Dict, List, Optional
+import urllib.parse
+
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
+
+from src.config import AppConfig, load_config, normalize_tunnel_url
+from src.queue_manager import TTSItem
+from src.session_manager import SessionInstance, SessionManager
+
+logger = logging.getLogger(__name__)
+
+# Initialize FastAPI application instance
+app = FastAPI(
+    title="TikTok Live TTS Cloud Web Platform",
+    description="Multi-tenant cloud platform bridging TikTok Live chat events with Text-to-Speech (TTS) synthesis for streaming overlays.",
+    version="2.0.0",
+)
+
+# Cross-Origin Resource Sharing (CORS) middleware configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Setup directories for static assets and Jinja2 HTML templates
+BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "static"
+TEMPLATES_DIR = BASE_DIR / "templates"
+
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+# Singleton in-memory session registry and lifecycle manager
+session_manager = SessionManager()
+
+# Initialize default application configuration and TTS engine state
+try:
+    app.state.config = load_config()
+except Exception:
+    app.state.config = AppConfig(tiktok_username="", fish_audio_api_key="")
+app.state.tts_engine = None
+
+
+class ColabSettingsRequest(BaseModel):
+    """Pydantic model validating Google Colab Cloudflare tunnel settings."""
+
+    colab_tunnel_url: Optional[str] = Field(None, description="Cloudflare Quick Tunnel URL (e.g. https://...trycloudflare.com).")
+    prefer_colab_tts: Optional[bool] = Field(None, description="Whether to prioritize Google Colab Edge-TTS over local fallback.")
+    colab_tts_timeout_seconds: Optional[float] = Field(None, description="Network timeout threshold in seconds for Colab TTS synthesis.")
+    session_id: Optional[str] = Field(None, description="Target session UUID if applicable.")
+    admin_token: Optional[str] = Field(None, description="Streamer admin authorization token.")
+    token: Optional[str] = Field(None, description="Alias for admin authorization token.")
+
+
+class StartSessionRequest(BaseModel):
+    """Pydantic model validating live session creation parameters."""
+
+    tiktok_username: str = Field(..., description="Target TikTok creator username (e.g. '@username').")
+    fish_audio_api_key: str = Field(..., description="User-provided Fish Audio Application Programming Interface (API) key.")
+    proxy_url: Optional[str] = Field(None, description="Optional forward HTTP or SOCKS5 proxy URL.")
+    enable_comments: bool = Field(True, description="Enable speech synthesis for regular viewer chat comments.")
+    enable_gifts: bool = Field(True, description="Enable priority speech synthesis for virtual gift events.")
+    user_cooldown: int = Field(5, description="Per-user anti-spam cooldown window in seconds.")
+    max_comment_length: int = Field(80, description="Maximum character threshold before text truncation.")
+    custom_phonetics: Optional[Dict[str, str]] = Field(None, description="Dictionary of slang to Thai pronunciation overrides.")
+    custom_blacklist: Optional[List[str]] = Field(None, description="List of prohibited profanities and filtered words.")
+
+
+# ==============================================================================
+# HTML Template User Interface (UI) Endpoints
+# ==============================================================================
+
+@app.get("/", response_class=HTMLResponse)
+async def get_index_page(request: Request) -> HTMLResponse:
+    """Render landing page for session creation and creator onboarding.
+
+    Args:
+        request: FastAPI Request instance.
+
+    Returns:
+        Rendered HTML response for templates/index.html.
+    """
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+    )
+
+
+@app.get("/overlay/{session_id}", response_class=HTMLResponse)
+async def get_overlay_page(
+    request: Request,
+    session_id: str,
+    token: str = Query(..., description="Overlay read-only security token."),
+) -> HTMLResponse:
+    """Render transparent visual alert and Web Audio playback overlay for OBS Studio.
+
+    Requires valid overlay token matching the active session.
+
+    Args:
+        request: FastAPI Request instance.
+        session_id: Target session Universally Unique Identifier (UUID).
+        token: Overlay read-only security token.
+
+    Raises:
+        HTTPException 404: If the session does not exist.
+        HTTPException 403: If the token does not match session overlay token.
+
+    Returns:
+        Rendered HTML response for templates/overlay.html.
+    """
+    session = session_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    if not secrets.compare_digest(token, session.overlay_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Invalid overlay authorization token",
+        )
+
+    session.touch()
+    return templates.TemplateResponse(
+        request=request,
+        name="overlay.html",
+        context={
+            "session_id": session.session_id,
+            "token": token,
+            "tiktok_username": session.tiktok_username,
+        },
+    )
+
+
+@app.get("/dashboard/{session_id}", response_class=HTMLResponse)
+async def get_dashboard_page(
+    request: Request,
+    session_id: str,
+    token: str = Query(..., description="Streamer admin security token."),
+) -> HTMLResponse:
+    """Render streamer control dashboard with live feed and emergency controls.
+
+    Requires valid admin token matching the active session.
+
+    Args:
+        request: FastAPI Request instance.
+        session_id: Target session Universally Unique Identifier (UUID).
+        token: Streamer admin security token.
+
+    Raises:
+        HTTPException 404: If the session does not exist.
+        HTTPException 403: If the token does not match session admin token.
+
+    Returns:
+        Rendered HTML response for templates/dashboard.html.
+    """
+    session = session_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    if not secrets.compare_digest(token, session.admin_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Invalid admin authorization token",
+        )
+
+    session.touch()
+    app_config: Optional[AppConfig] = getattr(request.app.state, "config", None)
+    return templates.TemplateResponse(
+        request=request,
+        name="dashboard.html",
+        context={
+            "session_id": session.session_id,
+            "token": token,
+            "overlay_token": session.overlay_token,
+            "tiktok_username": session.tiktok_username,
+            "enable_comments": session.enable_comments,
+            "enable_gifts": session.enable_gifts,
+            "colab_tunnel_url": app_config.colab_tunnel_url if app_config else "",
+            "prefer_colab_tts": app_config.prefer_colab_tts if app_config else True,
+        },
+    )
+
+
+@app.get("/health", status_code=status.HTTP_200_OK)
+async def health_check() -> Dict[str, Any]:
+    """Health check probe endpoint.
+
+    Returns:
+        JSON response with service status and active session count.
+    """
+    active_count = len(session_manager.get_all_sessions())
+    return {
+        "status": "ok",
+        "active_sessions": active_count,
+    }
+
+
+@app.get("/api/stats", status_code=status.HTTP_200_OK)
+async def get_stats(request: Request) -> Dict[str, Any]:
+    """Retrieve platform runtime statistics, Colab tunnel URL, and active TTS engine.
+
+    Args:
+        request: FastAPI Request instance.
+
+    Returns:
+        JSON dictionary containing runtime statistics and active engine state.
+    """
+    config: Optional[AppConfig] = getattr(request.app.state, "config", None)
+    tts_engine = getattr(request.app.state, "tts_engine", None)
+    last_engine = getattr(tts_engine, "last_engine", "") if tts_engine else ""
+    active_count = len(session_manager.get_all_sessions())
+
+    return {
+        "colab_tunnel_url": config.colab_tunnel_url if config else None,
+        "prefer_colab_tts": config.prefer_colab_tts if config else False,
+        "colab_tts_timeout_seconds": config.colab_tts_timeout_seconds if config else 2.0,
+        "last_engine": last_engine,
+        "active_sessions": active_count,
+    }
+
+
+@app.get("/api/settings/colab", status_code=status.HTTP_200_OK)
+async def get_colab_settings(request: Request) -> Dict[str, Any]:
+    """Retrieve current Google Colab Cloudflare tunnel configuration.
+
+    Args:
+        request: FastAPI Request instance.
+
+    Returns:
+        JSON dictionary with current colab_tunnel_url, prefer_colab_tts, and colab_tts_timeout_seconds.
+    """
+    config: Optional[AppConfig] = getattr(request.app.state, "config", None)
+    if config is None:
+        config = AppConfig(tiktok_username="", fish_audio_api_key="")
+        request.app.state.config = config
+
+    return {
+        "colab_tunnel_url": config.colab_tunnel_url,
+        "prefer_colab_tts": config.prefer_colab_tts,
+        "colab_tts_timeout_seconds": config.colab_tts_timeout_seconds,
+    }
+
+
+@app.post("/api/settings/colab", status_code=status.HTTP_200_OK)
+async def update_colab_settings(
+    payload: ColabSettingsRequest,
+    request: Request,
+    session_id: Optional[str] = Query(None, description="Target session UUID."),
+    token: Optional[str] = Query(None, description="Admin authorization token query parameter."),
+    admin_token: Optional[str] = Query(None, description="Admin authorization token query parameter."),
+) -> Dict[str, Any]:
+    """Update runtime Google Colab Cloudflare tunnel configuration and synchronize with active sessions.
+
+    Strips whitespace and trailing slashes from the URL (empty string resets to None).
+    Normalizes schemeless URLs by prepending https://. Validates that the URL scheme is strictly http or https.
+    Authorizes modification if a session is targeted or active.
+    Synchronizes runtime settings across app.state.config, all active sessions, and app.state.tts_engine.
+
+    Args:
+        payload: Validated ColabSettingsRequest parameters.
+        request: FastAPI Request instance.
+        session_id: Optional target session UUID query parameter.
+        token: Optional admin token query parameter.
+        admin_token: Optional admin token query parameter.
+
+    Returns:
+        JSON dictionary confirming update status and active settings.
+    """
+    # Resolve authorization token
+    header_token = None
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        header_token = auth_header[7:].strip()
+    x_admin = request.headers.get("x-admin-token", "").strip()
+    if x_admin:
+        header_token = x_admin
+
+    effective_token = (
+        token
+        or admin_token
+        or payload.admin_token
+        or payload.token
+        or header_token
+    )
+    target_session_id = session_id or payload.session_id
+
+    # Verify authorization if a session is targeted or active
+    if target_session_id:
+        target_session = session_manager.get_session(target_session_id)
+        if target_session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found",
+            )
+        if not effective_token or not secrets.compare_digest(effective_token, target_session.admin_token):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Invalid admin authorization token",
+            )
+    else:
+        active_sessions = session_manager.get_all_sessions()
+        if active_sessions:
+            if not effective_token or not any(
+                secrets.compare_digest(effective_token, s.admin_token) for s in active_sessions
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Forbidden: Invalid admin authorization token",
+                )
+
+    config: Optional[AppConfig] = getattr(request.app.state, "config", None)
+    if config is None:
+        config = AppConfig(tiktok_username="", fish_audio_api_key="")
+        request.app.state.config = config
+
+    if payload.colab_tunnel_url is not None:
+        raw_url = payload.colab_tunnel_url.strip()
+        if not raw_url:
+            config.colab_tunnel_url = None
+        else:
+            normalized = normalize_tunnel_url(raw_url)
+            parsed = urllib.parse.urlparse(normalized)
+            if parsed.scheme not in ("http", "https") or not parsed.netloc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid URL scheme. Must be http or https",
+                )
+            config.colab_tunnel_url = normalized
+
+    if payload.prefer_colab_tts is not None:
+        config.prefer_colab_tts = payload.prefer_colab_tts
+
+    if payload.colab_tts_timeout_seconds is not None:
+        config.colab_tts_timeout_seconds = payload.colab_tts_timeout_seconds
+
+    # Synchronize across all active sessions
+    for session in session_manager.get_all_sessions():
+        if session.tts_engine is not None and hasattr(session.tts_engine, "_config"):
+            session.tts_engine._config.colab_tunnel_url = config.colab_tunnel_url
+            session.tts_engine._config.prefer_colab_tts = config.prefer_colab_tts
+            session.tts_engine._config.colab_tts_timeout_seconds = config.colab_tts_timeout_seconds
+
+    # Synchronize with running TTSEngine if bound to app state
+    tts_engine = getattr(request.app.state, "tts_engine", None)
+    if tts_engine is not None and hasattr(tts_engine, "_config"):
+        tts_engine._config.colab_tunnel_url = config.colab_tunnel_url
+        tts_engine._config.prefer_colab_tts = config.prefer_colab_tts
+        tts_engine._config.colab_tts_timeout_seconds = config.colab_tts_timeout_seconds
+
+    return {
+        "status": "ok",
+        "colab_tunnel_url": config.colab_tunnel_url,
+        "prefer_colab_tts": config.prefer_colab_tts,
+        "colab_tts_timeout_seconds": config.colab_tts_timeout_seconds,
+    }
+
+
+@app.post("/api/session/start", status_code=status.HTTP_200_OK)
+async def start_session(payload: StartSessionRequest, request: Request) -> Dict[str, Any]:
+    """Create a new live stream Text-to-Speech (TTS) session with dual security tokens.
+
+    Generates unique session identifiers, an admin token for full streamer dashboard
+    controls, and a separate read-only overlay token for Open Broadcaster Software (OBS)
+    browser sources.
+
+    Args:
+        payload: Validated StartSessionRequest parameters.
+        request: FastAPI Request instance.
+
+    Returns:
+        JSON payload containing session IDs, tokens, and navigation URLs.
+    """
+    app_config: Optional[AppConfig] = getattr(request.app.state, "config", getattr(app.state, "config", None))
+    colab_tunnel_url = app_config.colab_tunnel_url if app_config else None
+    prefer_colab_tts = app_config.prefer_colab_tts if app_config else True
+    colab_tts_timeout_seconds = app_config.colab_tts_timeout_seconds if app_config else 5.0
+
+    session: SessionInstance = session_manager.create_session(
+        tiktok_username=payload.tiktok_username,
+        fish_audio_api_key=payload.fish_audio_api_key,
+        proxy_url=payload.proxy_url,
+        enable_comments=payload.enable_comments,
+        enable_gifts=payload.enable_gifts,
+        user_cooldown=payload.user_cooldown,
+        max_comment_length=payload.max_comment_length,
+        custom_phonetics=payload.custom_phonetics,
+        custom_blacklist=payload.custom_blacklist,
+        colab_tunnel_url=colab_tunnel_url,
+        prefer_colab_tts=prefer_colab_tts,
+        colab_tts_timeout_seconds=colab_tts_timeout_seconds,
+    )
+
+    return {
+        "session_id": session.session_id,
+        "admin_token": session.admin_token,
+        "overlay_token": session.overlay_token,
+        "overlay_url": f"/overlay/{session.session_id}?token={session.overlay_token}",
+        "dashboard_url": f"/dashboard/{session.session_id}?token={session.admin_token}",
+    }
+
+
+@app.get("/api/session/{session_id}/status", status_code=status.HTTP_200_OK)
+async def get_session_status(
+    session_id: str,
+    token: str = Query(..., description="Admin or Overlay authorization token."),
+) -> Dict[str, Any]:
+    """Retrieve operational status, queue size, and client connections for a session.
+
+    Accepts either an admin token or an overlay token.
+
+    Args:
+        session_id: Target session Universally Unique Identifier (UUID).
+        token: Authorization security token.
+
+    Raises:
+        HTTPException 404: If the session does not exist.
+        HTTPException 403: If the provided token is invalid.
+
+    Returns:
+        JSON dictionary containing session status indicators.
+    """
+    session = session_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    is_admin = secrets.compare_digest(token, session.admin_token)
+    is_overlay = secrets.compare_digest(token, session.overlay_token)
+    if not (is_admin or is_overlay):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid authorization token",
+        )
+
+    session.touch()
+    return {
+        "session_id": session.session_id,
+        "tiktok_username": session.tiktok_username,
+        "enable_comments": session.enable_comments,
+        "enable_gifts": session.enable_gifts,
+        "queue_size": session.queue_manager.get_queue_size(),
+        "connected_overlays_count": len(session.connected_overlays),
+        "connected_dashboards_count": len(session.connected_dashboards),
+    }
+
+
+@app.post("/api/session/{session_id}/flush", status_code=status.HTTP_200_OK)
+async def emergency_flush_queue(
+    session_id: str,
+    token: str = Query(..., description="Streamer admin authorization token."),
+) -> Dict[str, Any]:
+    """Purge all pending speech synthesis tasks and broadcast emergency mute.
+
+    Requires privileged admin token authorization. Drops all waiting items in the
+    TTSQueueManager and dispatches a CONTROL_FLUSH message to connected overlay
+    WebSocket clients.
+
+    Args:
+        session_id: Target session Universally Unique Identifier (UUID).
+        token: Streamer admin security token.
+
+    Raises:
+        HTTPException 404: If the session does not exist.
+        HTTPException 403: If the admin token is invalid or missing.
+
+    Returns:
+        JSON response with flushed status and dropped item count.
+    """
+    session = session_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    if not secrets.compare_digest(token, session.admin_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin token required for queue flush",
+        )
+
+    session.touch()
+    dropped_count = session.queue_manager.clear_queue()
+    await broadcast_flush(session_id)
+
+    return {
+        "flushed": True,
+        "dropped_count": dropped_count,
+    }
+
+
+@app.post("/api/session/{session_id}/test_voice", status_code=status.HTTP_200_OK)
+async def test_voice_synthesis(
+    session_id: str,
+    token: str = Query(..., description="Streamer admin authorization token."),
+) -> Dict[str, Any]:
+    """Enqueue an immediate high-priority test speech synthesis task and broadcast audio.
+
+    Requires privileged admin token authorization. Synthesizes Base64 audio and
+    dispatches an ALERT WebSocket message to connected overlays and dashboards.
+
+    Args:
+        session_id: Target session Universally Unique Identifier (UUID).
+        token: Streamer admin security token.
+
+    Raises:
+        HTTPException 404: If the session does not exist.
+        HTTPException 403: If the admin token is invalid.
+
+    Returns:
+        JSON response confirming test task enqueue and active TTS engine.
+    """
+    session = session_manager.get_session(session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    if not secrets.compare_digest(token, session.admin_token):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Admin token required for voice test",
+        )
+
+    session.touch()
+    text = "ทดสอบระบบเสียงสังเคราะห์ ติ๊กต็อกไลฟ์สำเร็จ"
+    test_item = TTSItem(
+        text=text,
+        user_id="system",
+        event_type="system",
+        priority=0,
+    )
+    session.queue_manager.put(test_item)
+
+    b64_audio = ""
+    if session.tts_engine is not None:
+        try:
+            b64_audio = await session.tts_engine.synthesize_base64(text)
+        except Exception as exc:
+            logger.warning("TTS synthesis failed in test_voice: %s", exc)
+
+    engine_name = getattr(session.tts_engine, "last_engine", "Fish Audio") if session.tts_engine else "Fish Audio"
+    payload = {
+        "type": "ALERT",
+        "audio_base64": b64_audio,
+        "user": "System (ระบบ)",
+        "text": text,
+        "gift_name": None,
+        "gift_count": 0,
+        "engine": engine_name,
+    }
+    await broadcast_to_overlays(session_id, payload)
+    await broadcast_to_dashboards(session_id, payload)
+
+    return {
+        "success": True,
+        "engine": getattr(session.tts_engine, "last_engine", engine_name) if session.tts_engine else engine_name,
+    }
+
+
+# ==============================================================================
+# Real-Time WebSocket (WS) Hub & Remote Controls
+# ==============================================================================
+
+async def broadcast_to_overlays(session_id: str, message: dict) -> None:
+    """Dispatch a JSON message to all connected Open Broadcaster Software (OBS) overlays.
+
+    Automatically prunes stale or disconnected WebSocket instances.
+
+    Args:
+        session_id: Unique session Universally Unique Identifier (UUID).
+        message: Dictionary payload to serialize and transmit.
+    """
+    session = session_manager.get_session(session_id)
+    if not session:
+        return
+
+    stale: List[Any] = []
+    for ws in list(session.connected_overlays):
+        try:
+            await ws.send_json(message)
+        except Exception as exc:
+            logger.debug("Failed sending to overlay WS: %s", exc)
+            stale.append(ws)
+
+    for ws in stale:
+        session.connected_overlays.discard(ws)
+
+
+async def broadcast_to_dashboards(session_id: str, message: dict) -> None:
+    """Dispatch a JSON message to all connected streamer control dashboards.
+
+    Automatically prunes stale or disconnected WebSocket instances.
+
+    Args:
+        session_id: Unique session Universally Unique Identifier (UUID).
+        message: Dictionary payload to serialize and transmit.
+    """
+    session = session_manager.get_session(session_id)
+    if not session:
+        return
+
+    stale: List[Any] = []
+    for ws in list(session.connected_dashboards):
+        try:
+            await ws.send_json(message)
+        except Exception as exc:
+            logger.debug("Failed sending to dashboard WS: %s", exc)
+            stale.append(ws)
+
+    for ws in stale:
+        session.connected_dashboards.discard(ws)
+
+
+async def broadcast_flush(session_id: str) -> None:
+    """Broadcast emergency stop and queue flush to all connected overlays and dashboards.
+
+    Args:
+        session_id: Unique session Universally Unique Identifier (UUID).
+    """
+    flush_message = {"type": "CONTROL_FLUSH"}
+    await broadcast_to_overlays(session_id, flush_message)
+    await broadcast_to_dashboards(session_id, flush_message)
+
+
+@app.websocket("/ws/overlay/{session_id}")
+async def websocket_overlay_endpoint(websocket: WebSocket, session_id: str) -> None:
+    """Real-time WebSocket endpoint for Open Broadcaster Software (OBS) Studio overlays.
+
+    Authenticates using the read-only overlay token, accepts the connection, registers
+    it in the session's connected_overlays set, and maintains an event loop until disconnect.
+
+    Args:
+        websocket: FastAPI WebSocket connection instance.
+        session_id: Target session Universally Unique Identifier (UUID).
+    """
+    token = websocket.query_params.get("token")
+    session = session_manager.get_session(session_id)
+
+    if session is None or not token or not secrets.compare_digest(token, session.overlay_token):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await websocket.accept()
+    session.connected_overlays.add(websocket)
+    session.touch()
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.debug("Overlay WebSocket exception: %s", exc)
+    finally:
+        session.connected_overlays.discard(websocket)
+        session.touch()
+
+
+@app.websocket("/ws/dashboard/{session_id}")
+async def websocket_dashboard_endpoint(websocket: WebSocket, session_id: str) -> None:
+    """Real-time WebSocket endpoint for streamer remote control dashboards.
+
+    Authenticates using the privileged admin token, accepts the connection, registers
+    it in the session's connected_dashboards set, and listens for remote control commands:
+    - toggle_comments: enable or disable regular chat speech synthesis.
+    - toggle_gifts: enable or disable virtual gift announcement synthesis.
+    - emergency_flush: purge pending queue items and dispatch CONTROL_FLUSH.
+
+    Args:
+        websocket: FastAPI WebSocket connection instance.
+        session_id: Target session Universally Unique Identifier (UUID).
+    """
+    token = websocket.query_params.get("token")
+    session = session_manager.get_session(session_id)
+
+    if session is None or not token or not secrets.compare_digest(token, session.admin_token):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await websocket.accept()
+    session.connected_dashboards.add(websocket)
+    session.touch()
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+            session.touch()
+            if not isinstance(data, dict):
+                continue
+            action = data.get("action")
+            if action == "toggle_comments":
+                session.enable_comments = bool(data.get("enabled", True))
+            elif action == "toggle_gifts":
+                session.enable_gifts = bool(data.get("enabled", True))
+            elif action == "emergency_flush":
+                session.queue_manager.clear_queue()
+                await broadcast_flush(session_id)
+    except WebSocketDisconnect:
+        pass
+    except Exception as exc:
+        logger.debug("Dashboard WebSocket exception: %s", exc)
+    finally:
+        session.connected_dashboards.discard(websocket)
+        session.touch()

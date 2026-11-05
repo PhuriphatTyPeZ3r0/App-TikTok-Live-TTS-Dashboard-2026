@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok Live TTS Overlay - {{ tiktok_username }}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    /* Absolute transparent canvas for OBS Studio & TikTok LIVE Studio */
+    html, body {
+      background: transparent !important;
+      background-color: transparent !important;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body class="overlay-body">
+
+  <!-- Glassmorphism Visual Alert Popup Container -->
+  <div id="overlay-alert" class="overlay-alert-card" style="backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); background: rgba(255,255,255,0.1); border-radius: 16px; border: 1px solid rgba(255,255,255,0.2);">
+    <div id="alert-avatar" class="overlay-avatar">💬</div>
+    <div class="overlay-content">
+      <div class="overlay-user">
+        <span id="alert-username">@viewer</span>
+        <span id="alert-badge" class="overlay-gift-badge" style="display: none;">🎁 GIFT</span>
+      </div>
+      <div id="alert-message" class="overlay-text">
+        ข้อความแชทสดจากผู้ชม
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+  <script>
+    const sessionId = "{{ session_id }}";
+    const overlayToken = "{{ token }}";
+    const username = "{{ tiktok_username }}";
+
+    const alertCard = document.getElementById('overlay-alert');
+    const alertAvatar = document.getElementById('alert-avatar');
+    const alertUsername = document.getElementById('alert-username');
+    const alertBadge = document.getElementById('alert-badge');
+    const alertMessage = document.getElementById('alert-message');
+
+    // Instantiate Web Audio API Engine
+    const audioPlayer = new AudioQueuePlayer();
+
+    // Callback when speech alert begins
+    audioPlayer.onAlertStart = (item) => {
+      alertUsername.textContent = item.user_id ? (item.user_id.startsWith('@') ? item.user_id : '@' + item.user_id) : '@ผู้ชม';
+      alertMessage.textContent = item.text || '';
+
+      if (item.event_type === 'gift') {
+        alertAvatar.textContent = '🎁';
+        alertAvatar.style.background = 'linear-gradient(135deg, #f59e0b, #ef4444)';
+        alertBadge.style.display = 'inline-block';
+        alertBadge.textContent = '🎁 GIFT';
+      } else {
+        alertAvatar.textContent = '💬';
+        alertAvatar.style.background = 'linear-gradient(135deg, var(--tiktok-cyan), var(--tiktok-red))';
+        alertBadge.style.display = 'none';
+      }
+
+      alertCard.classList.add('active');
+    };
+
+    // Callback when speech alert ends
+    audioPlayer.onAlertEnd = () => {
+      alertCard.classList.remove('active');
+    };
+
+    // Auto-resume AudioContext on user interaction
+    window.addEventListener('click', () => {
+      audioPlayer.ensureContext();
+    });
+
+    // Real-Time WebSocket Connection with Auto-Reconnect
+    let socket = null;
+    let reconnectDelay = 1000;
+
+    function connectWebSocket() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/overlay/${sessionId}?token=${overlayToken}`;
+
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        console.log('[OBS Overlay] Connected to real-time TTS WebSocket hub');
+        reconnectDelay = 1000;
+        audioPlayer.ensureContext();
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+
+          // Handle Emergency Flush
+          if (payload.type === 'CONTROL_FLUSH') {
+            console.log('[OBS Overlay] Emergency CONTROL_FLUSH received. Clearing audio queue.');
+            audioPlayer.flush();
+            return;
+          }
+
+          // Handle Inbound TTS Speech Event
+          if (payload.audio_base64) {
+            audioPlayer.enqueue(payload);
+          }
+        } catch (err) {
+          console.error('[OBS Overlay] Error parsing WebSocket message:', err);
+        }
+      };
+
+      socket.onclose = (event) => {
+        console.warn(`[OBS Overlay] WebSocket disconnected (code: ${event.code}). Retrying in ${reconnectDelay}ms...`);
+        setTimeout(() => {
+          reconnectDelay = Math.min(reconnectDelay * 1.5, 10000);
+          connectWebSocket();
+        }, reconnectDelay);
+      };
+
+      socket.onerror = (err) => {
+        console.error('[OBS Overlay] WebSocket error:', err);
+      };
+    }
+
+    // Initialize connection
+    connectWebSocket();
+  </script>
+</body>
+</html>

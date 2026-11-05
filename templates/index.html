@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TikTok Live TTS Bot - Cloud Web Platform</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="page-container">
+    <!-- Header Hero -->
+    <header style="text-align: center; margin-bottom: 2.5rem;">
+      <div class="badge badge-online" style="margin-bottom: 1rem;">
+        <span class="pulse-dot"></span> V2.0 Cloud Web Edition
+      </div>
+      <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">
+        <span class="gradient-text">TikTok Live TTS Bot</span>
+      </h1>
+      <p style="color: var(--text-muted); font-size: 1.1rem; max-width: 600px; margin: 0 auto;">
+        ระบบแปลงคอมเมนต์และของขวัญไลฟ์ติ๊กต็อกเป็นเสียงสังเคราะห์ความหน่วงต่ำ พร้อมวิดเจ็ตโปร่งใสสำหรับ OBS Studio และ TikTok LIVE Studio
+      </p>
+    </header>
+
+    <!-- Main Card Form -->
+    <main class="glass-panel" style="max-width: 640px; margin: 0 auto;">
+      <form id="start-session-form">
+        <!-- Target Creator Username -->
+        <div class="form-group">
+          <label for="tiktok_username">🎯 บัญชี TikTok ของคุณ (@username)</label>
+          <input type="text" id="tiktok_username" name="tiktok_username" placeholder="@your_channel" required autocomplete="off">
+          <div class="input-hint">ใส่ชื่อช่องที่กำลังเริ่มไลฟ์ เช่น @gamer_thailand หรือ gamer_thailand</div>
+        </div>
+
+        <!-- Fish Audio API Key (BYOK) -->
+        <div class="form-group">
+          <label for="fish_audio_api_key">🔑 Fish Audio API Key (Bring Your Own Key)</label>
+          <input type="password" id="fish_audio_api_key" name="fish_audio_api_key" placeholder="sk-..." required autocomplete="off">
+          <div class="input-hint">ระบบจะบันทึกคีย์ไว้ในเบราว์เซอร์ส่วนตัว (localStorage) เพื่อความปลอดภัยสูงสุด</div>
+        </div>
+
+        <!-- Advanced Options Toggle -->
+        <details style="margin: 1.5rem 0; border: 1px solid var(--border-glass); border-radius: 10px; padding: 0.75rem 1rem; background: rgba(15, 23, 42, 0.4);">
+          <summary style="cursor: pointer; font-weight: 600; color: var(--tiktok-cyan); outline: none;">
+            ⚙️ ตัวเลือกขั้นสูง (Advanced Settings & Anti-Spam)
+          </summary>
+          <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+            
+            <div class="toggle-wrapper" style="margin-bottom: 0;">
+              <div>
+                <div style="font-weight: 500; font-size: 0.9rem;">อ่านคอมเมนต์ทั่วไป (Enable Comments)</div>
+                <div style="font-size: 0.75rem; color: var(--text-dim);">สังเคราะห์เสียงเมื่อมีข้อความแชทใหม่</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="enable_comments" name="enable_comments" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="toggle-wrapper" style="margin-bottom: 0;">
+              <div>
+                <div style="font-weight: 500; font-size: 0.9rem;">อ่านของขวัญแทรกคิวด่วน (Enable Gifts)</div>
+                <div style="font-size: 0.75rem; color: var(--text-dim);">เสียงกระดิ่งเตือนและแทรกคิวของขวัญก่อนคอมเมนต์</div>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="enable_gifts" name="enable_gifts" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="user_cooldown">⏱️ คูลดาวน์ผู้ใช้ (วินาที)</label>
+                <input type="number" id="user_cooldown" name="user_cooldown" value="5" min="1" max="60">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="max_comment_length">✂️ ความยาวสูงสุด (ตัวอักษร)</label>
+                <input type="number" id="max_comment_length" name="max_comment_length" value="80" min="10" max="300">
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label for="proxy_url">🌐 Proxy URL (ไม่บังคับ)</label>
+              <input type="text" id="proxy_url" name="proxy_url" placeholder="http://user:pass@host:port">
+              <div class="input-hint">สำหรับบายพาสข้อจำกัดเครือข่ายของ TikTok Ingestion</div>
+            </div>
+
+          </div>
+        </details>
+
+        <!-- Submit Button -->
+        <button type="submit" id="submit-btn" class="btn btn-primary" style="width: 100%; font-size: 1.05rem; padding: 0.85rem;">
+          🚀 เริ่มใช้งานสตรีม / Start Live Session
+        </button>
+      </form>
+    </main>
+  </div>
+
+  <!-- Session Ready Modal -->
+  <div id="session-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎉</div>
+        <h2 style="font-size: 1.5rem;">สร้างเซสชันสำเร็จแล้ว!</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">นำลิงก์ด้านล่างไปใส่ใน OBS Studio และเปิดหน้าแดชบอร์ด</p>
+      </div>
+
+      <div class="form-group">
+        <label>🖼️ OBS Browser Source URL (Overlay):</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <input type="text" id="modal-overlay-url" readonly style="font-size: 0.85rem;">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="copyToClipboard(document.getElementById('modal-overlay-url').value)">
+            📋 คัดลอก
+          </button>
+        </div>
+        <div class="input-hint">แนะนำตั้งค่าขนาดใน OBS: กว้าง 1920 สูง 1080 และเปิดเสียงผ่าน Browser Source</div>
+      </div>
+
+      <div style="display: flex; gap: 1rem; margin-top: 1.75rem;">
+        <a id="modal-dashboard-link" href="#" target="_blank" class="btn btn-primary" style="flex: 1;">
+          🎛️ เปิดแดชบอร์ดควบคุม
+        </a>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('session-modal').classList.remove('active')">
+          ปิดหน้าต่าง
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+  <script>
+    // Load persisted Fish Audio API Key from localStorage
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedKey = localStorage.getItem('fish_audio_api_key');
+      if (savedKey) {
+        document.getElementById('fish_audio_api_key').value = savedKey;
+      }
+      const savedUsername = localStorage.getItem('tiktok_username');
+      if (savedUsername) {
+        document.getElementById('tiktok_username').value = savedUsername;
+      }
+    });
+
+    // Handle Form Submit
+    const form = document.getElementById('start-session-form');
+    const submitBtn = document.getElementById('submit-btn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ กำลังสร้างห้องสตรีม...';
+
+      let username = document.getElementById('tiktok_username').value.trim();
+      if (!username.startsWith('@')) {
+        username = '@' + username;
+      }
+      const apiKey = document.getElementById('fish_audio_api_key').value.trim();
+      const proxyUrl = document.getElementById('proxy_url').value.trim() || null;
+      const enableComments = document.getElementById('enable_comments').checked;
+      const enableGifts = document.getElementById('enable_gifts').checked;
+      const userCooldown = parseInt(document.getElementById('user_cooldown').value, 10) || 5;
+      const maxCommentLength = parseInt(document.getElementById('max_comment_length').value, 10) || 80;
+
+      // Save credentials to localStorage
+      localStorage.setItem('fish_audio_api_key', apiKey);
+      localStorage.setItem('tiktok_username', username);
+
+      try {
+        const response = await fetch('/api/session/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tiktok_username: username,
+            fish_audio_api_key: apiKey,
+            proxy_url: proxyUrl,
+            enable_comments: enableComments,
+            enable_gifts: enableGifts,
+            user_cooldown: userCooldown,
+            max_comment_length: maxCommentLength
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.detail || 'Failed to start session');
+        }
+
+        const data = await response.json();
+        const origin = window.location.origin;
+        const fullOverlayUrl = origin + data.overlay_url;
+        const fullDashboardUrl = origin + data.dashboard_url;
+
+        // Persist session tokens for quick restoration
+        localStorage.setItem(`overlay_token_${data.session_id}`, data.overlay_token);
+        localStorage.setItem(`admin_token_${data.session_id}`, data.admin_token);
+        localStorage.setItem('latest_session_id', data.session_id);
+
+        document.getElementById('modal-overlay-url').value = fullOverlayUrl;
+        document.getElementById('modal-dashboard-link').href = fullDashboardUrl;
+        document.getElementById('session-modal').classList.add('active');
+
+      } catch (err) {
+        console.error('Session start error:', err);
+        showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '🚀 เริ่มใช้งานสตรีม / Start Live Session';
+      }
+    });
+  </script>
+</body>
+</html>
