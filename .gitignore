@@ -38,5 +38,8 @@ cloudflare-gateway/.wrangler/
 # Superpowers execution directory
 .superpowers/
 
-# Shipped assets (the gift chime) are tracked despite the *.wav rule above
+# Shipped assets (the gift chime and voice prompts) are tracked despite the audio rules above
 !assets/*.wav
+!colab/assets/*.mp3
+!huggingface-space/assets/*.mp3
+

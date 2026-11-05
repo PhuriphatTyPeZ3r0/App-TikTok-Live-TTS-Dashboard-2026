@@ -1,0 +1,13 @@
+spaces
+gradio>=4.40.0
+torch>=2.1.0
+torchaudio>=2.1.0
+hydra-core
+omegaconf
+vector_quantize_pytorch==1.14.24
+loralib
+fastapi
+uvicorn
+soundfile
+pydub
+huggingface_hub
