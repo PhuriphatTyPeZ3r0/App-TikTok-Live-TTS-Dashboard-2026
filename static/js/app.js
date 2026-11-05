@@ -156,4 +156,16 @@ class AudioQueuePlayer {
       this.onAlertEnd();
     }
   }
+
+  pause() {
+    if (this.ctx && this.ctx.state === 'running') {
+      return this.ctx.suspend();
+    }
+  }
+
+  resume() {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      return this.ctx.resume();
+    }
+  }
 }
