@@ -133,6 +133,45 @@ def test_queue_feed_component_contract():
     assert "onSkipItem" in content, "Must support skipping individual queue items"
 
 
+def test_queue_feed_red_broadcast_playlist_styling():
+    """Verify QueueFeed.tsx conforms to Red Broadcast playlist/video item specification."""
+    assert QUEUE_FEED_FILE.exists(), f"Missing {QUEUE_FEED_FILE}"
+    content = QUEUE_FEED_FILE.read_text(encoding="utf-8")
+
+    # 36px circular avatar
+    assert "h-9 w-9 rounded-full" in content, "Avatar must be 36px circular (h-9 w-9 rounded-full)"
+    assert "bg-neutral-200" in content and "dark:bg-neutral-800" in content, (
+        "Avatar must have neutral bg token styling (bg-neutral-200 dark:bg-neutral-800)"
+    )
+
+    # Roboto 500 / medium username styling and 2-line clamped text
+    assert "font-medium" in content, "Channel/Username must use Roboto weight 500 (font-medium)"
+    assert "line-clamp-2" in content, "Message text strictly clamped to 2 lines (line-clamp-2)"
+    assert "text-[#0F0F0F]" in content or "text-broadcast-dark" in content or "dark:text-white" in content, (
+        "Message text must use high-contrast Red Broadcast typography"
+    )
+
+    # Metadata line
+    assert "รออ่านในคิว (In Queue)" in content, "Must display metadata 'รออ่านในคิว (In Queue)'"
+
+    # Filter tabs
+    assert "ทั้งหมด" in content, "Must have 'ทั้งหมด' filter tab"
+    assert "เฉพาะของขวัญ" in content, "Must have 'เฉพาะของขวัญ 🎁' filter tab"
+    assert "แชท" in content, "Must have 'แชท 💬' filter tab"
+
+    # Clear Queue
+    assert "ล้างคิวทั้งหมด" in content, "Must have 'ล้างคิวทั้งหมด' button"
+    assert "onClearQueue" in content, "Must support onClearQueue callback"
+
+    # Flat cards with 1px broadcast border, Elevation Level 0
+    assert "border-broadcast-border-light" in content or "border-neutral-200" in content
+    assert "border-broadcast-border-dark" in content or "border-neutral-800" in content
+
+    # Props contract compatibility
+    for prop in ["queue", "onClearQueue", "currentSpeaker", "isSpeaking", "onSkipCurrent", "activeFilter", "onSelectFilter"]:
+        assert prop in content, f"QueueFeedProps must support {prop} for contract compatibility"
+
+
 def test_colab_status_card_component_contract():
     """Verify ColabStatusCard.tsx GPU status, active engine, and tunnel URL configuration."""
     assert COLAB_STATUS_FILE.exists(), f"Missing {COLAB_STATUS_FILE}"

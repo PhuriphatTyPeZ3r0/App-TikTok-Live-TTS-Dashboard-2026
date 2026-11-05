@@ -1,13 +1,35 @@
 "use client";
 
 /**
- * Apple visionOS Frosted Liquid Glass Queue Feed Component for Next.js 15.
+ * ============================================================================
+ * Red Broadcast Queue Feed Component (Video Grid & Playlist Layout)
+ * ============================================================================
  *
- * Single-Page Application (SPA) queue visualizer communicating with FastAPI
- * Asynchronous Server Gateway Interface (ASGI) server, coordinating with
- * the Web Audio Application Programming Interface (Web Audio API) and First-In, First-Out (FIFO) queue.
+ * Professional playlist and video item queue feed visualizer designed for
+ * the Red Broadcast design system in Next.js 15 Single-Page Application (SPA).
+ * Interfaces with FastAPI Asynchronous Server Gateway Interface (ASGI) backend,
+ * Web Audio Application Programming Interface (Web Audio API), Text-to-Speech (TTS)
+ * synthesis pipeline, and First-In, First-Out (FIFO) ingestion queue.
  *
- * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Voice Actor Attribution: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Master Thai Voice Model for Text-to-Speech (TTS) live streaming systems.
+ *
+ * Design Specifications:
+ * - 36px circular avatar (`h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800`).
+ * - Channel / Username in Roboto weight 500 (`text-sm font-medium`).
+ * - Message text strictly clamped to 2 lines (`line-clamp-2 text-sm text-[#0F0F0F] dark:text-white`).
+ * - Compact metadata line: "X เหรียญ/เพชร • รออ่านในคิว (In Queue)" with secondary text
+ *   (`text-xs text-neutral-500 dark:text-neutral-400`).
+ * - VIP Gift badges with diamond icon (💎) or gift icon (🎁).
+ * - Filter tabs with high-contrast active styling:
+ *   `[ ทั้งหมด ]`, `[ เฉพาะของขวัญ 🎁 ]`, `[ แชท 💬 ]`.
+ * - Empty queue message exact string: "ไม่มีคิวข้อความรออ่าน (Queue is idle)".
+ * - Clear Queue button with exact label "ล้างคิวทั้งหมด" and `onClearQueue` callback.
+ * - Flat cards with 1px border (`border-broadcast-border-light dark:border-broadcast-border-dark`),
+ *   Elevation Level 0 (no drop shadows).
+ * - Broadcast Red (#FF0000) is strictly reserved for live indicators, audio progress bars,
+ *   and critical emergency flush actions.
+ * ============================================================================
  */
 
 import React, { useState, useMemo } from "react";
@@ -27,21 +49,52 @@ import type { QueueItem, SpeakingItem } from "../types/dashboard";
 export interface QueueFeedProps {
   /** First-In, First-Out (FIFO) list of pending speech synthesis items. */
   queue: QueueItem[];
-  /** Currently active speech synthesis payload, or null if audio pipeline is idle. */
-  speakingItem: SpeakingItem | null;
-  /** Callback to skip or discard a specific item from the queue by its unique ID. */
-  onSkipItem?: (id: string) => void;
   /** Callback to purge the entire pending queue. */
   onClearQueue?: () => void;
+  /** Currently active speaker item, or null if audio pipeline is idle. */
+  currentSpeaker?: QueueItem | SpeakingItem | null;
+  /** Whether the speech synthesis engine is actively outputting audio. */
+  isSpeaking?: boolean;
+  /** Callback to skip the currently speaking item. */
+  onSkipCurrent?: () => void;
+  /** Active filter tab key ('all' | 'gifts' | 'comments'). */
+  activeFilter?: string;
+  /** Callback when user changes the active filter tab. */
+  onSelectFilter?: (filter: string) => void;
+  /** Backward-compatible alias for currently active speech synthesis payload. */
+  speakingItem?: SpeakingItem | null;
+  /** Callback to skip or discard a specific item from the queue by its unique ID. */
+  onSkipItem?: (id: string) => void;
+  /** Additional Cascading Style Sheets (CSS) classes. */
+  className?: string;
 }
 
 export function QueueFeed({
   queue,
-  speakingItem,
-  onSkipItem,
   onClearQueue,
-}: QueueFeedProps) {
-  const [filter, setFilter] = useState<"all" | "gifts" | "comments">("all");
+  currentSpeaker = null,
+  isSpeaking = false,
+  onSkipCurrent,
+  activeFilter,
+  onSelectFilter,
+  speakingItem = null,
+  onSkipItem,
+  className = "",
+}: QueueFeedProps): React.JSX.Element {
+  // Resolve unified active speaker across legacy and Red Broadcast props
+  const resolvedSpeaker = currentSpeaker || speakingItem;
+  const isCurrentlySpeaking = isSpeaking || Boolean(speakingItem);
+
+  // Local filter fallback when activeFilter is not controlled externally
+  const [internalFilter, setInternalFilter] = useState<string>("all");
+  const selectedFilter = activeFilter !== undefined ? activeFilter : internalFilter;
+
+  const handleFilterChange = (nextFilter: string) => {
+    if (onSelectFilter) {
+      onSelectFilter(nextFilter);
+    }
+    setInternalFilter(nextFilter);
+  };
 
   const giftsCount = useMemo(
     () => queue.filter((i) => Boolean(i.is_gift)).length,
@@ -53,31 +106,44 @@ export function QueueFeed({
   );
 
   const filteredQueue = useMemo(() => {
-    if (filter === "gifts") {
+    if (selectedFilter === "gifts" || selectedFilter === "gift") {
       return queue.filter((i) => Boolean(i.is_gift));
     }
-    if (filter === "comments") {
+    if (selectedFilter === "comments" || selectedFilter === "comment") {
       return queue.filter((i) => !i.is_gift);
     }
     return queue;
-  }, [queue, filter]);
+  }, [queue, selectedFilter]);
+
+  const handleSkipSpeaker = () => {
+    if (onSkipCurrent) {
+      onSkipCurrent();
+    } else if (onSkipItem && resolvedSpeaker?.id) {
+      onSkipItem(resolvedSpeaker.id);
+    }
+  };
 
   return (
-    <div className="flex flex-col h-full liquid-glass specular-border rounded-2xl p-5 shadow-2xl backdrop-blur-2xl transition-all duration-300">
-      {/* Feed Header & Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-white/10 gap-3 mb-4">
+    <div
+      className={`flex flex-col h-full rounded-2xl border border-broadcast-border-light dark:border-broadcast-border-dark bg-white dark:bg-broadcast-dark p-5 transition-all duration-300 ${className}`}
+      aria-label="Speech Queue Playlist Feed"
+    >
+      {/* ==================================================================== */}
+      {/* Feed Header & Clear Queue Action                                     */}
+      {/* ==================================================================== */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3.5 border-b border-broadcast-border-light dark:border-broadcast-border-dark gap-3 mb-4">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-white/10 border border-white/10 text-cyan-300">
+          <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 border border-broadcast-border-light dark:border-broadcast-border-dark">
             <ListOrdered className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold tracking-wide text-white flex items-center gap-2">
+            <h2 className="text-sm font-semibold tracking-wide text-neutral-900 dark:text-white flex items-center gap-2">
               คิวเสียงพูด (Speech Queue)
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-broadcast-border-light dark:border-broadcast-border-dark">
                 {queue.length} ในคิว
               </span>
             </h2>
-            <p className="text-[11px] text-white/50">
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
               ข้อความสดจาก TikTok Live เรียงลำดับตาม First-In, First-Out (FIFO)
             </p>
           </div>
@@ -88,100 +154,93 @@ export function QueueFeed({
           <button
             type="button"
             onClick={onClearQueue}
-            className="self-end sm:self-auto flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-rose-300 hover:text-rose-100 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-all active:scale-95"
+            className="self-end sm:self-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-950 dark:hover:text-white bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 border border-broadcast-border-light dark:border-broadcast-border-dark transition-colors active:scale-95"
+            title="ล้างคิวข้อความทั้งหมด"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
             <span>ล้างคิวทั้งหมด</span>
           </button>
         )}
       </div>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 mb-3.5 bg-black/40 p-1 rounded-xl border border-white/10 text-xs">
+      {/* ==================================================================== */}
+      {/* Filter Tabs with High-Contrast Active Styling                        */}
+      {/* ==================================================================== */}
+      <div className="flex items-center gap-2 mb-4 text-xs select-none">
         <button
           type="button"
-          onClick={() => setFilter("all")}
-          className={`flex-1 py-1 px-2.5 rounded-lg font-medium transition-all ${
-            filter === "all"
-              ? "bg-white/15 text-white shadow-sm border border-white/10"
-              : "text-white/50 hover:text-white/80"
+          onClick={() => handleFilterChange("all")}
+          className={`py-1.5 px-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-1 border ${
+            selectedFilter === "all"
+              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-none"
+              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 border-transparent"
           }`}
         >
-          ทั้งหมด ({queue.length})
+          <span>[ ทั้งหมด ]</span>
+          <span className="opacity-75">({queue.length})</span>
         </button>
+
         <button
           type="button"
-          onClick={() => setFilter("gifts")}
-          className={`flex-1 py-1 px-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1 ${
-            filter === "gifts"
-              ? "bg-amber-500/20 text-amber-300 shadow-sm border border-amber-400/30"
-              : "text-white/50 hover:text-amber-200"
+          onClick={() => handleFilterChange("gifts")}
+          className={`py-1.5 px-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 border ${
+            selectedFilter === "gifts" || selectedFilter === "gift"
+              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-none"
+              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 border-transparent"
           }`}
         >
-          <Gift className="w-3 h-3 text-amber-400" />
-          <span>ของขวัญ ({giftsCount})</span>
+          <Gift className="w-3.5 h-3.5" />
+          <span>[ เฉพาะของขวัญ 🎁 ]</span>
+          <span className="opacity-75">({giftsCount})</span>
         </button>
+
         <button
           type="button"
-          onClick={() => setFilter("comments")}
-          className={`flex-1 py-1 px-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1 ${
-            filter === "comments"
-              ? "bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-400/30"
-              : "text-white/50 hover:text-cyan-200"
+          onClick={() => handleFilterChange("comments")}
+          className={`py-1.5 px-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 border ${
+            selectedFilter === "comments" || selectedFilter === "comment"
+              ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-none"
+              : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 border-transparent"
           }`}
         >
-          <MessageSquare className="w-3 h-3 text-cyan-400" />
-          <span>แชท ({commentsCount})</span>
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>[ แชท 💬 ]</span>
+          <span className="opacity-75">({commentsCount})</span>
         </button>
       </div>
 
-      {/* Now Speaking Hero Spotlight */}
+      {/* ==================================================================== */}
+      {/* Active Speaker Spotlight Banner (Optional In-Queue Hero)            */}
+      {/* ==================================================================== */}
       <AnimatePresence mode="wait">
-        {speakingItem && (
+        {resolvedSpeaker && (
           <motion.div
-            key={speakingItem.id || "speaking-banner"}
-            initial={{ opacity: 0, y: -8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="mb-4 p-4 rounded-xl bg-gradient-to-r from-cyan-500/20 via-blue-500/15 to-transparent border border-cyan-400/50 shadow-[0_0_25px_rgba(0,242,254,0.2)] relative overflow-hidden"
+            key={resolvedSpeaker.id || "speaking-banner"}
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.15 }}
+            className="mb-4 p-3.5 rounded-xl border border-broadcast-border-light dark:border-broadcast-border-dark bg-neutral-50 dark:bg-neutral-900/80 flex flex-col gap-2 relative overflow-hidden"
           >
-            <div className="flex items-center justify-between mb-2">
+            {/* Top Indicator Row */}
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500 shadow-[0_0_8px_rgba(0,242,254,0.8)]"></span>
+                {/* Broadcast Red Live Indicator (Strictly permitted for live broadcast status) */}
+                <span className="bg-[#FF0000] text-white font-bold text-[10px] px-1.5 py-0.5 rounded-[2px] tracking-wider uppercase flex items-center gap-1 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  <span>กำลังพากย์เสียง</span>
                 </span>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1">
-                  <Volume2 className="w-3.5 h-3.5 animate-bounce" />
-                  กำลังพูดสด (Now Speaking)
+                <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                  <Volume2 className="w-3.5 h-3.5 text-neutral-700 dark:text-neutral-300" />
+                  <span>กำลังพูดสด (Now Speaking)</span>
                 </span>
               </div>
 
-              {/* Sound Wave Bars Simulation */}
-              <div className="flex items-center gap-1 h-3.5">
-                {[40, 90, 60, 100, 75, 45].map((h, i) => (
-                  <motion.div
-                    key={i}
-                    animate={{ height: [`${h * 0.3}%`, `${h}%`, `${h * 0.4}%`] }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: 0.6 + i * 0.1,
-                      ease: "easeInOut",
-                    }}
-                    className="w-0.5 rounded-full bg-cyan-400 shadow-[0_0_4px_rgba(0,242,254,0.8)]"
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="text-sm font-semibold text-white flex items-center justify-between">
-              <span>{speakingItem.user}</span>
-              {onSkipItem && (
+              {(onSkipCurrent || onSkipItem) && (
                 <button
                   type="button"
-                  onClick={() => onSkipItem(speakingItem.id)}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-white/70 hover:text-white bg-white/10 hover:bg-white/20 transition-all"
+                  onClick={handleSkipSpeaker}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-neutral-200 hover:bg-neutral-300 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 transition-colors"
                   title="ข้ามเสียงนี้"
                 >
                   <SkipForward className="w-3 h-3" />
@@ -190,89 +249,147 @@ export function QueueFeed({
               )}
             </div>
 
-            <div className="text-xs text-white/95 mt-1 leading-relaxed font-light line-clamp-2">
-              &ldquo;{speakingItem.text}&rdquo;
+            {/* Speaker Metadata & 2-Line Clamped Message */}
+            <div className="flex items-start gap-3 mt-1">
+              {/* 36px circular avatar */}
+              <div className="h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center font-medium text-xs text-neutral-700 dark:text-neutral-200 shrink-0 border border-broadcast-border-light dark:border-broadcast-border-dark">
+                {resolvedSpeaker.user ? resolvedSpeaker.user.replace(/^@/, "").charAt(0).toUpperCase() : "AI"}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                    {resolvedSpeaker.user}
+                  </span>
+                  {"is_gift" in resolvedSpeaker && Boolean((resolvedSpeaker as QueueItem).is_gift) && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0">
+                      {(resolvedSpeaker as QueueItem).gift_name ? `🎁 ${(resolvedSpeaker as QueueItem).gift_name}` : "💎 VIP Gift"}
+                    </span>
+                  )}
+                </div>
+
+                <p className="line-clamp-2 text-sm text-[#0F0F0F] dark:text-white mt-0.5 leading-snug">
+                  &ldquo;{resolvedSpeaker.text}&rdquo;
+                </p>
+
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  {"diamonds" in resolvedSpeaker && (resolvedSpeaker as QueueItem).diamonds
+                    ? `${(resolvedSpeaker as QueueItem).diamonds} เหรียญ/เพชร (💎) • กำลังสังเคราะห์เสียง`
+                    : "คอมเมนต์แชทสด • กำลังสังเคราะห์เสียง"}
+                </p>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Scrollable Queue Item List */}
-      <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-[260px] max-h-[480px] scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+      {/* ==================================================================== */}
+      {/* Scrollable Playlist Queue Item List                                  */}
+      {/* ==================================================================== */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-[260px] max-h-[480px] scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-700 scrollbar-track-transparent">
         <AnimatePresence initial={false}>
           {filteredQueue.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center justify-center h-48 rounded-xl border border-dashed border-white/10 text-center p-6 text-white/40"
+              className="flex flex-col items-center justify-center h-48 rounded-xl border border-dashed border-broadcast-border-light dark:border-broadcast-border-dark text-center p-6 text-neutral-400"
             >
-              <Sparkles className="w-8 h-8 text-white/20 mb-2" />
-              <p className="text-xs font-medium text-white/60">
+              <Sparkles className="w-8 h-8 text-neutral-300 dark:text-neutral-600 mb-2" />
+              <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
                 ไม่มีคิวข้อความรออ่าน (Queue is idle)
               </p>
-              <p className="text-[11px] text-white/30 mt-1">
+              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
                 เมื่อมีผู้ชมส่งคอมเมนต์หรือของขวัญ ระบบจะนำมาเรียงอ่านที่นี่โดยอัตโนมัติ
               </p>
             </motion.div>
           ) : (
             filteredQueue.map((item, index) => {
               const isGift = Boolean(item.is_gift);
+              const avatarInitial = item.user
+                ? item.user.replace(/^@/, "").charAt(0).toUpperCase()
+                : "U";
 
               return (
                 <motion.div
                   key={item.id || `queue-item-${index}`}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ duration: 0.15 }}
-                  className={`p-3 rounded-xl border flex items-start justify-between gap-3 transition-all ${
-                    isGift
-                      ? "bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border-amber-400/40 shadow-[0_0_15px_rgba(251,191,36,0.1)]"
-                      : "bg-white/[0.04] border-white/10 hover:border-white/20"
-                  }`}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.12 }}
+                  className="p-3 rounded-xl border border-broadcast-border-light dark:border-broadcast-border-dark bg-white dark:bg-broadcast-dark hover:bg-neutral-50 dark:hover:bg-neutral-800/60 flex items-start justify-between gap-3 transition-colors"
                 >
-                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                  {/* Left: 36px circular avatar & details */}
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    {/* 36px circular avatar (h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800) */}
                     <div
-                      className={`p-1.5 rounded-lg border mt-0.5 shrink-0 ${
-                        isGift
-                          ? "bg-amber-500/20 border-amber-400/40 text-amber-300 shadow-sm"
-                          : "bg-white/10 border-white/10 text-cyan-300"
-                      }`}
+                      className="h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center font-medium text-xs text-neutral-700 dark:text-neutral-200 shrink-0 border border-broadcast-border-light dark:border-broadcast-border-dark"
+                      aria-hidden="true"
                     >
-                      {isGift ? <Gem className="w-3.5 h-3.5" /> : <MessageSquare className="w-3.5 h-3.5" />}
+                      {isGift ? "🎁" : avatarInitial}
                     </div>
 
+                    {/* Metadata & Message */}
                     <div className="min-w-0 flex-1">
+                      {/* Channel / Username row */}
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-white/90 truncate">
+                        <span className="text-sm font-medium text-neutral-900 dark:text-white truncate">
                           {item.user}
                         </span>
+
+                        {/* VIP Gift badges with diamond icon (💎) or gift icon (🎁) */}
                         {isGift && (
-                          <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 shrink-0">
-                            {item.gift_name ? `🎁 ${item.gift_name}` : "VIP Gift"}
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0">
+                            {item.gift_name ? `🎁 ${item.gift_name}` : "💎 VIP Gift"}
                             {item.diamonds ? ` (${item.diamonds} diamonds)` : ""}
                           </span>
                         )}
-                        <span className="text-[10px] text-white/30 font-mono shrink-0 ml-auto">
+
+                        <span className="text-xs text-neutral-400 font-mono shrink-0 ml-auto">
                           #{index + 1}
                         </span>
                       </div>
 
-                      <div className="text-xs text-white/75 mt-0.5 break-words line-clamp-2 leading-relaxed">
+                      {/* Message text strictly clamped to 2 lines */}
+                      <div className="line-clamp-2 text-sm text-[#0F0F0F] dark:text-white mt-0.5 break-words leading-snug">
                         {item.text}
+                      </div>
+
+                      {/* Compact metadata line: "X เหรียญ/เพชร • รออ่านในคิว (In Queue)" */}
+                      <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 flex items-center gap-1">
+                        {isGift && item.diamonds ? (
+                          <>
+                            <span>💎 {item.diamonds} เหรียญ/เพชร</span>
+                            <span>•</span>
+                            <span>รออ่านในคิว (In Queue)</span>
+                          </>
+                        ) : isGift ? (
+                          <>
+                            <span>🎁 ของขวัญพิเศษ</span>
+                            <span>•</span>
+                            <span>รออ่านในคิว (In Queue)</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>แชท TikTok Live</span>
+                            <span>•</span>
+                            <span>รออ่านในคิว (In Queue)</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
 
+                  {/* Right: Discard/Skip Item Action */}
                   {onSkipItem && (
                     <button
                       type="button"
                       onClick={() => onSkipItem(item.id)}
-                      className="p-1 rounded-md text-white/30 hover:text-rose-400 hover:bg-rose-500/10 transition-colors shrink-0 mt-0.5"
+                      className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0 mt-0.5"
                       title="ลบออกจากคิว"
+                      aria-label={`ลบข้อความของ ${item.user} ออกจากคิว`}
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </motion.div>
