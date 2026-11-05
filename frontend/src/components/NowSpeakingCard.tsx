@@ -1,256 +1,255 @@
 "use client";
 
 /**
- * ============================================================================
- * Red Broadcast Video Spotlight Player Card (Now Speaking)
- * ============================================================================
+ * NowSpeakingCard Component
  *
- * Professional 16:9 aspect ratio spotlight player card designed for the Red Broadcast
- * design system in Next.js 15 Single-Page Application (SPA) dashboard.
- * Interfacing with FastAPI Asynchronous Server Gateway Interface (ASGI) backend,
- * Web Audio Application Programming Interface (Web Audio API), Fast Fourier Transform (FFT)
- * audio spectrum simulation, High-Definition Audio (HD Audio) rendering, and
- * First-In, First-Out (FIFO) queue states.
+ * TikFinity-style Now Speaking Card for TikTok Live stream speech synthesis.
+ * Features dark glassmorphism styling, real-time speaker spotlight, animated 8-bar
+ * audio waveform visualizer, speech bubble, and streamer quick controls (Skip, Pause, Clear).
  *
- * Voice Actor Attribution: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
- * Master Thai Voice Actor Model for Text-to-Speech (TTS) live streaming systems.
- *
- * Design Specifications:
- * - 16:9 aspect ratio (`aspect-video` / `aspect-[16/9]`) video player container.
- * - Broadcast Red `[● LIVE]` badge (`bg-[#FF0000] text-white font-bold text-xs px-2 py-0.5 rounded-[2px] tracking-wider uppercase`).
- * - Top-right: Streamer/Session status indicator ("สตรีมสด AI เสียงพากย์").
- * - Center area: Integrated audio waveform visualizer via `<AudioVisualizer isSpeaking={isSpeaking} />`.
- * - Bottom overlay of player: Audio Progress Bar in Broadcast Red (`h-1 bg-[#FF0000] transition-all duration-300`).
- * - Bottom metadata row:
- *     - 36px circular avatar (`h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800`).
- *     - Title & Speaker details: Speaker username, message text clamped to 2 lines (`line-clamp-2 text-sm text-[#0F0F0F] dark:text-white`).
- *     - Subtitle: "เสียงพากย์: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)".
- *     - Actions: Pill Skip button ("ข้าม", `rounded-full px-4 py-1.5 text-xs font-medium bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700`).
- * - Idle state: Clean 16:9 standby screen with "รอข้อความเสียงพากย์สด (Standby for Live Stream Speech)".
- * ============================================================================
+ * Voice Actor Model: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  */
 
-import React, { useState, useEffect } from "react";
-import { AudioVisualizer } from "./AudioVisualizer";
-import { SkipForward, Radio, User, Volume2, Sparkles, Gem } from "lucide-react";
-import type { QueueItem, SpeakingItem } from "../types/dashboard";
+import React from "react";
+import { QueueItem } from "../types/tikfinity";
+import type { SpeakingItem } from "../types/dashboard";
+import { Radio, Mic, Volume2 } from "lucide-react";
 
 export interface NowSpeakingCardProps {
-  /**
-   * Currently active speaker payload (SpeakingItem or QueueItem), or null if idle.
-   */
-  currentSpeaker?: SpeakingItem | QueueItem | null;
-  /**
-   * Whether the Text-to-Speech (TTS) synthesis engine is actively outputting audio.
-   */
-  isSpeaking?: boolean;
-  /**
-   * Callback to skip the current speaker item.
-   */
+  currentSpeaker: QueueItem | SpeakingItem | any | null;
+  isPlaying?: boolean;
+  isPaused?: boolean;
   onSkip?: () => void;
-  /**
-   * Optional manual progress percentage (0 - 100) for the audio playback bar.
-   */
-  progressPercent?: number;
-  /**
-   * Additional Cascading Style Sheets (CSS) class names.
-   */
+  onTogglePause?: () => void;
+  onClearQueue?: () => void;
+  // Legacy prop compatibility
+  isSpeaking?: boolean;
   className?: string;
 }
 
 export function NowSpeakingCard({
   currentSpeaker = null,
-  isSpeaking = false,
-  onSkip,
-  progressPercent,
+  isPlaying = false,
+  isPaused = false,
+  onSkip = () => {},
+  onTogglePause = () => {},
+  onClearQueue = () => {},
+  isSpeaking,
   className = "",
 }: NowSpeakingCardProps): React.JSX.Element {
-  // Synthesize simulated playback progress when actively speaking without explicit percent
-  const [internalProgress, setInternalProgress] = useState<number>(0);
+  // Resolve unified playing state across legacy and TikFinity props
+  const activeIsPlaying = isPlaying || (isSpeaking ?? false);
 
-  useEffect(() => {
-    if (!isSpeaking || !currentSpeaker) {
-      setInternalProgress(0);
-      return;
-    }
+  // Extract speaker attributes safely supporting both TikFinity & legacy models
+  const username =
+    currentSpeaker?.username || currentSpeaker?.user || "TikTok Viewer";
+  const text = currentSpeaker?.text || "";
+  const isGift = Boolean(currentSpeaker?.isGift || currentSpeaker?.is_gift);
+  const giftName = currentSpeaker?.giftName || currentSpeaker?.gift_name;
+  const giftAmount = currentSpeaker?.giftAmount;
+  const coins = currentSpeaker?.coins ?? currentSpeaker?.diamonds;
 
-    if (typeof progressPercent === "number") {
-      setInternalProgress(progressPercent);
-      return;
-    }
-
-    // Auto-progress simulation for smooth broadcast visual feedback
-    const startTime = Date.now();
-    // Estimate speaking duration based on text length (~120ms per character, min 2s, max 15s)
-    const estimatedDuration = Math.min(
-      Math.max((currentSpeaker.text?.length || 20) * 120, 2000),
-      15000
-    );
-
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const pct = Math.min((elapsed / estimatedDuration) * 100, 98);
-      setInternalProgress(pct);
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [isSpeaking, currentSpeaker, progressPercent]);
-
-  const activeProgress = typeof progressPercent === "number" ? progressPercent : internalProgress;
-
-  // Determine gift metadata if speaker is from QueueItem
-  const isGift = currentSpeaker && "is_gift" in currentSpeaker && Boolean((currentSpeaker as QueueItem).is_gift);
-  const giftName = currentSpeaker && "gift_name" in currentSpeaker ? (currentSpeaker as QueueItem).gift_name : undefined;
-  const diamonds = currentSpeaker && "diamonds" in currentSpeaker ? (currentSpeaker as QueueItem).diamonds : undefined;
-
-  // Extract avatar initial safely
-  const initial = currentSpeaker?.user
-    ? currentSpeaker.user.replace(/^@/, "").charAt(0).toUpperCase()
-    : "AI";
+  // Extract avatar initial
+  const avatarInitial = username.replace(/^@/, "").charAt(0).toUpperCase() || "T";
 
   return (
-    <article
-      className={`rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-broadcast-dark shadow-sm overflow-hidden flex flex-col transition-all duration-300 ${className}`}
+    <div
+      className={`bg-gradient-to-br from-[#161822] to-[#0d0f14] border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col gap-4 relative overflow-hidden ${className}`}
       aria-label="Now Speaking Player Spotlight"
     >
-      {/* ==================================================================== */}
-      {/* 16:9 Video Player Container Viewport                                  */}
-      {/* ==================================================================== */}
-      <div className="relative w-full aspect-video aspect-[16/9] bg-neutral-950 flex flex-col justify-between overflow-hidden select-none">
-        {/* Subtle background gradient & scanline effect */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90 pointer-events-none z-10" />
+      {/* Waveform Keyframe Animation Styles */}
+      <style>{`
+        @keyframes tikFinityWave {
+          0%, 100% {
+            height: 8px;
+            opacity: 0.45;
+          }
+          50% {
+            height: 32px;
+            opacity: 1;
+          }
+        }
+        .tik-wave-active {
+          animation: tikFinityWave 1.1s ease-in-out infinite;
+        }
+      `}</style>
 
-        {/* Top Overlay Controls Row */}
-        <div className="relative z-20 flex items-center justify-between p-3 sm:p-4">
-          {/* Top-left: Broadcast Red [● LIVE] Badge */}
-          <div className="flex items-center gap-2">
-            <span className="bg-[#FF0000] text-white font-bold text-xs px-2 py-0.5 rounded-[2px] tracking-wider uppercase flex items-center gap-1.5 shadow-sm">
-              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-              <span>LIVE</span>
-            </span>
-            {isSpeaking && (
-              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-white/70 bg-white/10 backdrop-blur-md px-2 py-0.5 rounded-[2px]">
-                <Volume2 className="w-3 h-3 text-[#FF0000]" />
-                <span>กำลังพากย์เสียง</span>
-              </span>
-            )}
-          </div>
-
-          {/* Top-right: Streamer/Session Status Indicator */}
-          <div className="flex items-center gap-2">
-            <div className="text-xs text-white/90 bg-neutral-900/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-              <Radio className="w-3.5 h-3.5 text-broadcast-red animate-pulse" />
-              <span className="font-medium text-[11px] sm:text-xs tracking-tight">
-                สตรีมสด AI เสียงพากย์
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Center Area: Integrated Audio Waveform Visualizer or Standby State */}
-        <div className="relative z-20 flex-1 flex flex-col items-center justify-center px-4">
+      {/* Top Header Row with Status Tags & Waveform Visualizer */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        {/* Status Indicators */}
+        <div className="flex items-center gap-2 flex-wrap">
           {currentSpeaker ? (
-            <div className="w-full flex flex-col items-center justify-center">
-              <AudioVisualizer
-                isSpeaking={isSpeaking}
-                accentColor="#00f2fe"
-                height={96}
-                barCount={32}
-                hideHeader={true}
-                className="w-full bg-transparent border-0 shadow-none p-0 max-w-lg"
-              />
-            </div>
+            <>
+              {/* Green Live Broadcasting Tag */}
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#00e676]/10 text-[#00e676] border border-[#00e676]/30 shadow-[0_0_12px_rgba(0,230,118,0.2)]">
+                <span className="w-2 h-2 rounded-full bg-[#00e676] animate-pulse" />
+                <span>🟢 กำลังอ่านออกอากาศ</span>
+              </span>
+
+              {/* Amber Gift Priority Tag */}
+              {isGift && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#ffb300]/15 text-[#ffb300] border border-[#ffb300]/40 shadow-[0_0_10px_rgba(255,179,0,0.25)]">
+                  <span>⚡ GIFT PRIORITY</span>
+                </span>
+              )}
+            </>
           ) : (
-            /* Idle Standby Screen */
-            <div className="flex flex-col items-center justify-center text-center py-4 px-3">
-              <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-2.5">
-                <Radio className="w-6 h-6 text-white/40 animate-pulse" />
-              </div>
-              <p className="text-xs sm:text-sm font-medium text-white/80 tracking-wide">
-                รอข้อความเสียงพากย์สด (Standby for Live Stream Speech)
-              </p>
-              <p className="text-[11px] text-white/40 mt-1 max-w-xs">
-                ข้อความและของขวัญจาก TikTok Live จะถูกส่งเข้ามาอ่านแบบเรียลไทม์
-              </p>
-            </div>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800/80 text-slate-400 border border-slate-700/60">
+              <span className="w-2 h-2 rounded-full bg-slate-500" />
+              <span>⚪ สแตนด์บาย (Standby)</span>
+            </span>
           )}
         </div>
 
-        {/* Bottom Overlay: Audio Progress Bar in Broadcast Red (#FF0000) */}
-        <div className="relative z-20 w-full h-1 bg-white/15 overflow-hidden">
-          <div
-            className="h-1 bg-[#FF0000] transition-all duration-300 ease-linear"
-            style={{
-              width: `${Math.max(0, Math.min(100, activeProgress))}%`,
-            }}
-            role="progressbar"
-            aria-valuenow={activeProgress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          />
+        {/* 8-Bar Waveform Visualizer */}
+        <div
+          className="flex items-center gap-1 h-9 px-3 py-1 bg-black/40 rounded-xl border border-slate-800/80"
+          aria-label="Audio Waveform"
+        >
+          {[0.12, 0.28, 0.44, 0.18, 0.36, 0.52, 0.22, 0.4].map((delay, idx) => {
+            const isBarActive = currentSpeaker && activeIsPlaying && !isPaused;
+            const isBarPaused = currentSpeaker && isPaused;
+
+            return (
+              <div
+                key={idx}
+                className={`w-1.5 rounded-full transition-all duration-300 ${
+                  isBarActive
+                    ? "bg-gradient-to-t from-[#25f4ee] to-[#fe2c55] tik-wave-active"
+                    : isBarPaused
+                    ? "bg-amber-400/70"
+                    : "bg-slate-700/50"
+                }`}
+                style={{
+                  height: isBarActive ? undefined : isBarPaused ? "18px" : "6px",
+                  animationDelay: isBarActive ? `${delay}s` : undefined,
+                  animationDuration: isBarActive
+                    ? `${0.85 + (idx % 3) * 0.2}s`
+                    : undefined,
+                  animationPlayState: isPaused ? "paused" : "running",
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 
-      {/* ==================================================================== */}
-      {/* Bottom Metadata & Controls Row                                        */}
-      {/* ==================================================================== */}
-      <div className="p-4 flex items-start justify-between gap-3 bg-white dark:bg-broadcast-dark">
-        {/* Left: 36px Circular Avatar and Details */}
-        <div className="flex items-start gap-3 min-w-0 flex-1">
-          {/* 36px Circular Avatar */}
-          <div className="h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center shrink-0 font-bold text-xs text-neutral-700 dark:text-neutral-300 border border-neutral-300/40 dark:border-neutral-700/50">
-            {currentSpeaker ? initial : <User className="w-4 h-4 text-neutral-400" />}
-          </div>
-
-          {/* Title, Speaker and Message Clamped to 2 lines */}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="font-semibold text-xs text-neutral-900 dark:text-neutral-100 truncate">
-                {currentSpeaker ? currentSpeaker.user : "พร้อมรับข้อความใหม่ (Ready for Messages)"}
-              </span>
-
-              {isGift && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                  <Gem className="w-2.5 h-2.5 fill-current" />
-                  <span>{giftName || "VIP Gift"}</span>
-                  {diamonds ? <span>({diamonds})</span> : null}
-                </span>
-              )}
+      {/* Main Content Area: Active Speaker vs Peaceful Standby */}
+      {currentSpeaker ? (
+        <div className="flex flex-col gap-3.5">
+          {/* User Info Row */}
+          <div className="flex items-center gap-3">
+            {/* Avatar (Emoji or Initials) */}
+            <div
+              className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border shadow-md ${
+                isGift
+                  ? "bg-gradient-to-br from-amber-400/20 to-amber-600/30 border-amber-400/50 text-amber-300 text-lg"
+                  : "bg-gradient-to-br from-cyan-400/20 to-blue-600/30 border-cyan-400/40 text-cyan-300"
+              }`}
+            >
+              {isGift ? "🎁" : avatarInitial}
             </div>
 
-            <p className="line-clamp-2 text-sm text-[#0F0F0F] dark:text-white font-normal leading-snug break-words">
-              {currentSpeaker
-                ? currentSpeaker.text
-                : "รอข้อความเสียงพากย์สด (Standby for Live Stream Speech)"}
+            {/* Username & Metadata */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-sm text-white tracking-wide truncate">
+                  {username}
+                </span>
+
+                {isGift && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-400/10 text-amber-300 border border-amber-400/30">
+                    <span>🎁 {giftName || "VIP Gift"}</span>
+                    {giftAmount && giftAmount > 1 ? <span>x{giftAmount}</span> : null}
+                    {typeof coins === "number" && <span>({coins} เหรียญ)</span>}
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                {isGift ? "ส่งของขวัญสนับสนุนสตรีมเมอร์" : "แชทสด TikTok LIVE"}
+              </p>
+            </div>
+          </div>
+
+          {/* Speech Bubble with Cyan Left Accent Border */}
+          <div className="relative bg-[#1a1f2c]/70 border border-slate-800/80 border-l-4 border-l-[#25f4ee] rounded-r-xl rounded-bl-xl p-4 shadow-inner">
+            <p className="text-slate-100 text-sm leading-relaxed break-words font-medium">
+              &ldquo;{text}&rdquo;
             </p>
-
-            {/* Voice Identity Subtitle */}
-            <div className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 flex items-center gap-1.5 flex-wrap">
-              <span>เสียงพากย์: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)</span>
-              {currentSpeaker && "engine" in currentSpeaker && (
-                <span className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 uppercase">
-                  · {currentSpeaker.engine}
+            <div className="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <Mic className="w-3 h-3 text-[#25f4ee]" />
+                <span>เสียงพากย์: คุณพิพัฒน์ บุญสิทธิเลิศ (Yuta)</span>
+              </span>
+              {currentSpeaker?.timestamp && (
+                <span className="text-[10px] font-mono text-slate-500">
+                  {new Date(currentSpeaker.timestamp).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
                 </span>
               )}
             </div>
           </div>
         </div>
-
-        {/* Right Action: Pill Skip Button ("ข้าม") */}
-        <div className="shrink-0 self-center">
-          <button
-            type="button"
-            onClick={onSkip}
-            disabled={!currentSpeaker || !onSkip}
-            title="ข้ามข้อความนี้ (Skip)"
-            className="rounded-full px-4 py-1.5 text-xs font-medium bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 transition-colors flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <SkipForward className="w-3.5 h-3.5" />
-            <span>ข้าม</span>
-          </button>
+      ) : (
+        /* Peaceful Standby State */
+        <div className="flex flex-col items-center justify-center py-7 text-center">
+          <div className="w-14 h-14 rounded-full bg-slate-800/80 border border-slate-700/80 flex items-center justify-center text-slate-400 mb-3 shadow-inner">
+            <Radio className="w-7 h-7 animate-pulse text-[#25f4ee]/70" />
+          </div>
+          <p className="text-sm font-semibold text-slate-200">
+            รอข้อความจาก TikTok LIVE...
+          </p>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm">
+            เมื่อมีข้อความแชทหรือของขวัญเข้ามา ระบบจะสังเคราะห์เสียงและเล่นออกอากาศสดทันที
+          </p>
         </div>
+      )}
+
+      {/* Action Buttons Row */}
+      <div className="flex items-center gap-2 pt-3 border-t border-slate-800/80">
+        {/* ⏭️ Skip */}
+        <button
+          type="button"
+          onClick={onSkip}
+          disabled={!currentSpeaker}
+          className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm"
+          title="ข้ามข้อความปัจจุบัน (Skip)"
+        >
+          <span>⏭️</span>
+          <span>Skip</span>
+        </button>
+
+        {/* ⏸️ Pause / ▶️ Resume */}
+        <button
+          type="button"
+          onClick={onTogglePause}
+          disabled={!currentSpeaker}
+          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm border ${
+            isPaused
+              ? "bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25"
+              : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600"
+          }`}
+          title={isPaused ? "เล่นต่อ (Resume)" : "พักชั่วคราว (Pause)"}
+        >
+          <span>{isPaused ? "▶️" : "⏸️"}</span>
+          <span>{isPaused ? "Resume" : "Pause"}</span>
+        </button>
+
+        {/* 🗑️ Clear Queue */}
+        <button
+          type="button"
+          onClick={onClearQueue}
+          className="ml-auto px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
+          title="ล้างคิวทั้งหมด (Clear Queue)"
+        >
+          <span>🗑️</span>
+          <span>Clear Queue</span>
+        </button>
       </div>
-    </article>
+    </div>
   );
 }
 
