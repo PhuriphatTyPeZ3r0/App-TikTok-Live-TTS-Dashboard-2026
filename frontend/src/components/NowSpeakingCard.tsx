@@ -3,7 +3,7 @@
 /**
  * NowSpeakingCard Component
  *
- * TikFinity-style Now Speaking Card for TikTok Live stream speech synthesis.
+ * TikFinity-style Now Speaking Card for TikTok Live stream Text-to-Speech (TTS) speech synthesis.
  * Features dark glassmorphism styling, real-time speaker spotlight, animated 8-bar
  * audio waveform visualizer, speech bubble, and streamer quick controls (Skip, Pause, Clear).
  *
