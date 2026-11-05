@@ -106,7 +106,7 @@ export function Sidebar({
                 <Icon
                   className={`w-5 h-5 shrink-0 ${
                     isActive
-                      ? "text-broadcast-red"
+                      ? "text-neutral-900 dark:text-white"
                       : "text-neutral-500 dark:text-neutral-400"
                   }`}
                 />

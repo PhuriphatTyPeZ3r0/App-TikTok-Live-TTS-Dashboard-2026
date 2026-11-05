@@ -46,6 +46,10 @@ export interface AudioVisualizerProps {
    * Number of frequency spectrum bars to render (typically 32 to 48 bins). Defaults to 36.
    */
   barCount?: number;
+  /**
+   * Whether to hide top telemetry header label (e.g. when embedded inside video player card).
+   */
+  hideHeader?: boolean;
 }
 
 export function AudioVisualizer({
@@ -54,6 +58,7 @@ export function AudioVisualizer({
   className = "",
   height = 120,
   barCount = 36,
+  hideHeader = false,
 }: AudioVisualizerProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -245,7 +250,7 @@ export function AudioVisualizer({
   return (
     <div
       ref={containerRef}
-      className={`liquid-glass specular-border rounded-2xl p-4 overflow-hidden relative transition-all duration-500 ${className}`}
+      className={`liquid-glass specular-border rounded-2xl p-4 overflow-hidden relative transition-all duration-500 bg-white/70 dark:bg-black/40 ${className}`}
     >
       {/* Ambient background glow reflecting real-time voice activity */}
       <div
@@ -256,25 +261,27 @@ export function AudioVisualizer({
       />
 
       {/* Header telemetry label */}
-      <div className="relative z-10 flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-block w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              isSpeaking ? "animate-pulse" : "bg-white/30"
-            }`}
-            style={{
-              backgroundColor: isSpeaking ? (accentColor || "#00f2fe") : undefined,
-              boxShadow: isSpeaking ? `0 0 8px ${accentColor || "#00f2fe"}` : undefined,
-            }}
-          />
-          <span className="text-xs font-semibold tracking-wider uppercase text-white/70">
-            {isSpeaking ? "Voice Synthesizer Active" : "Spectral Monitor Idle"}
-          </span>
+      {!hideHeader && (
+        <div className="relative z-10 flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                isSpeaking ? "animate-pulse" : "bg-neutral-400/40 dark:bg-white/30"
+              }`}
+              style={{
+                backgroundColor: isSpeaking ? (accentColor || "#00f2fe") : undefined,
+                boxShadow: isSpeaking ? `0 0 8px ${accentColor || "#00f2fe"}` : undefined,
+              }}
+            />
+            <span className="text-xs font-semibold tracking-wider uppercase text-neutral-800 dark:text-white/70">
+              {isSpeaking ? "Voice Synthesizer Active" : "Spectral Monitor Idle"}
+            </span>
+          </div>
+          <div className="text-[10px] text-neutral-500 dark:text-white/40 tracking-widest font-mono uppercase">
+            HD Audio · FFT {barCount}-Band
+          </div>
         </div>
-        <div className="text-[10px] text-white/40 tracking-widest font-mono uppercase">
-          HD Audio · FFT {barCount}-Band
-        </div>
-      </div>
+      )}
 
       {/* Primary rendering canvas */}
       <div className="relative z-10 flex justify-center items-center w-full">
