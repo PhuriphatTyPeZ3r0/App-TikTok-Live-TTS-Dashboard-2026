@@ -35,6 +35,7 @@ class TTSEngine:
         colab_tunnel_url: Optional[str] = None,
         prefer_colab_tts: Optional[bool] = None,
         colab_tts_timeout_seconds: Optional[float] = None,
+        hf_token: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize the TTS synthesis engine.
@@ -44,9 +45,10 @@ class TTSEngine:
             api_key: Optional Fish Audio API key override.
             cache_dir: Optional local directory for caching synthesized MP3 audio.
             model_id: Optional voice model reference identifier.
-            colab_tunnel_url: Optional Google Colab Cloudflare tunnel URL.
+            colab_tunnel_url: Optional Google Colab / Hugging Face Spaces tunnel URL.
             prefer_colab_tts: Optional boolean prioritizing Colab over fallback.
             colab_tts_timeout_seconds: Optional float timeout for Colab requests.
+            hf_token: Optional Bearer token for Hugging Face Spaces authentication.
             **kwargs: Additional configuration overrides.
         """
         if config is None:
@@ -73,10 +75,19 @@ class TTSEngine:
             self._config.colab_tts_timeout_seconds = colab_tts_timeout_seconds
         elif "colab_tts_timeout_seconds" in kwargs:
             self._config.colab_tts_timeout_seconds = kwargs["colab_tts_timeout_seconds"]
+        if hf_token is not None:
+            self._config.hf_token = hf_token
+        elif "hf_token" in kwargs:
+            self._config.hf_token = kwargs["hf_token"]
 
         self._config.cache_dir.mkdir(parents=True, exist_ok=True)
         # Exposed so the dashboard can show which engine produced the last utterance.
         self.last_engine: str = ""
+
+    @property
+    def config(self) -> AppConfig:
+        """Return the underlying AppConfig configuration dataclass."""
+        return self._config
 
     def get_cache_path(self, text: str, voice_id: str) -> Path:
         """Return the cache file path for ``text`` spoken by ``voice_id``."""
@@ -135,6 +146,45 @@ class TTSEngine:
         audio_bytes = await self.synthesize(text)
         return base64.b64encode(audio_bytes).decode("ascii")
 
+    async def warm_remote_engine(self, timeout: float = 3.0) -> bool:
+        """Asynchronously ping remote ZeroGPU / Colab endpoint to pre-warm dynamic allocation.
+
+        Sends a lightweight non-blocking GET /health request to wake up sleeping Zero-cost
+        Graphics Processing Unit (ZeroGPU) containers on Hugging Face (HF) Spaces or
+        Google Colaboratory (Colab) before live stream Text-to-Speech (TTS) events arrive.
+
+        Args:
+            timeout: Network request timeout in seconds (default: 3.0s).
+
+        Returns:
+            bool: True if remote endpoint returned HTTP 200, False otherwise.
+        """
+        if not self._config.prefer_colab_tts or not self._config.colab_tunnel_url:
+            return False
+
+        url = f"{self._config.colab_tunnel_url.rstrip('/')}/health"
+        headers = {
+            "User-Agent": "TikTok-Live-TTS-Bot/2.0",
+        }
+        if self._config.hf_token:
+            headers["Authorization"] = f"Bearer {self._config.hf_token}"
+
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.get(url, headers=headers)
+                if response.status_code == 200:
+                    logger.info("Remote TTS pre-warming successful (HTTP 200 at %s)", url)
+                    return True
+                logger.warning(
+                    "Remote TTS pre-warming returned HTTP %s from %s",
+                    response.status_code,
+                    url,
+                )
+                return False
+        except (httpx.HTTPError, Exception) as exc:
+            logger.warning("Remote TTS pre-warming ping failed (%s) at %s", exc, url)
+            return False
+
     async def _synthesize_colab(self, text: str) -> bytes:
         """Synthesize speech via Google Colab Fish Speech self-hosted endpoint."""
         if not self._config.colab_tunnel_url:
@@ -145,6 +195,8 @@ class TTSEngine:
             "Content-Type": "application/json",
             "User-Agent": "TikTok-Live-TTS-Bot/2.0",
         }
+        if self._config.hf_token:
+            headers["Authorization"] = f"Bearer {self._config.hf_token}"
         payload = {
             "text": text,
             "reference_id": "yuta",

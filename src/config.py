@@ -32,6 +32,7 @@ class AppConfig:
         colab_tunnel_url: Optional public Uniform Resource Locator (URL) for Google Colaboratory (Colab) tunnel endpoint.
         colab_tts_timeout_seconds: Network timeout threshold in seconds for Google Colab TTS synthesis requests.
         prefer_colab_tts: Flag prioritizing Google Colab Edge-TTS acceleration endpoint over local fallback.
+        hf_token: Optional Bearer token for authenticating with Hugging Face (HF) Spaces endpoints.
     """
 
     tiktok_username: str
@@ -50,6 +51,7 @@ class AppConfig:
     colab_tunnel_url: Optional[str] = None
     colab_tts_timeout_seconds: float = 5.0
     prefer_colab_tts: bool = True
+    hf_token: Optional[str] = None
 
 
 def _get_val(key: str, file_vars: dict, default: str) -> str:
@@ -163,6 +165,9 @@ def load_config(env_path: Optional[str] = None) -> AppConfig:
         _get_val("PREFER_COLAB_TTS", file_vars, "true"), default=True
     )
 
+    raw_hf_token = _get_val("HF_TOKEN", file_vars, "")
+    hf_token: Optional[str] = raw_hf_token if raw_hf_token else None
+
     return AppConfig(
         tiktok_username=tiktok_username,
         fish_audio_api_key=fish_audio_api_key,
@@ -180,4 +185,5 @@ def load_config(env_path: Optional[str] = None) -> AppConfig:
         colab_tunnel_url=colab_tunnel_url,
         colab_tts_timeout_seconds=colab_tts_timeout_seconds,
         prefer_colab_tts=prefer_colab_tts,
+        hf_token=hf_token,
     )
