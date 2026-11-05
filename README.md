@@ -11,13 +11,15 @@ pinned: false
 # 🎙️ TikTok Live Text-to-Speech (TTS) Bot & Cloud Web Platform
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1f4t-Q0H9QRwQwK4XlJS_DHwfsRPkEMz1)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces%20ZeroGPU-orange?style=for-the-badge&logo=huggingface&logoColor=white)](huggingface-space/)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-152%20passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-179%20passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Cloudflare Tunnel](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 
-High-performance, zero-cost, and robust asynchronous Text-to-Speech (TTS) bot and multi-tenant cloud platform for TikTok LIVE streamers. Converts incoming live chat comments and monetary gift events into real-time speech using a self-hosted Google Colab Fish Speech v1.5 Graphics Processing Unit (GPU) backend, backed by an automated 3-tier fallback engine (Fish Audio Free Developer Tier and Microsoft Edge Neural Text-to-Speech). Audio is delivered seamlessly via a **TikFinity-style Browser Source Overlay** (no Virtual Audio Cable driver required) or locally through a Virtual Audio Cable (VAC).
+High-performance, zero-cost, and robust asynchronous Text-to-Speech (TTS) bot and multi-tenant cloud platform for TikTok LIVE streamers. Converts incoming live chat comments and monetary gift events into real-time speech using a serverless **Hugging Face Spaces Zero-cost Graphics Processing Unit (ZeroGPU)** or self-hosted **Google Colaboratory (Colab)** Fish Speech v1.5 backend, backed by an automated 3-tier fallback engine (Fish Audio Free Developer Tier and Microsoft Edge Neural Text-to-Speech). Audio is delivered seamlessly via a **TikFinity-style Browser Source Overlay** (no Virtual Audio Cable driver required) or locally through a Virtual Audio Cable (VAC). Fully deployable 100% free ($0/month) on **Render Free Web Service** and **Hugging Face Spaces ZeroGPU**.
 
 ---
 
@@ -25,7 +27,9 @@ High-performance, zero-cost, and robust asynchronous Text-to-Speech (TTS) bot an
 
 > 🎙️ **Official Voice Attribution:**  
 > โมเดลเสียงพากย์ปัญญาประดิษฐ์ (Artificial Intelligence: AI Voice Clone) ในโครงงานนี้ ได้รับการเทรนและสังเคราะห์จากเสียงของ **"พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)"** นักพากย์ภาพยนตร์และอนิเมะมืออาชีพของประเทศไทย (เป็นที่รู้จักอย่างกว้างขวางในฐานะผู้พากย์เสียงภาษาไทยของตัวละคร *ยูตะ อคคทสึ (Yuta Okkotsu)* ในภาพยนตร์ Jujutsu Kaisen 0)  
-> ตัวโมเดลประมวลผลด้วยสถาปัตยกรรม Dual Autoregressive (Dual-AR) Large Language Model (LLM) และ Firefly-Generative Adversarial Network (Firefly-GAN) Vector Quantization Finite Scalar Quantization (VQ-FSQ) ของ Fish Speech v1.5 บน Google Colab Tesla T4 Graphics Processing Unit (GPU) ในฟอร์แมต Half-Precision Floating-Point Format (FP16) ให้ความเร็วในการสังเคราะห์เสียงต่ำกว่า 1.5 วินาที
+> * **รหัสเสียงหลัก (Primary Voice ID):** `phiphat`  
+> * **รหัสอ้างอิงเดิมเพื่อความเข้ากันได้ย้อนหลัง (Backward-Compatible Alias):** `yuta`  
+> ตัวโมเดลประมวลผลด้วยสถาปัตยกรรม Dual Autoregressive (Dual-AR) Large Language Model (LLM) และ Firefly-Generative Adversarial Network (Firefly-GAN) Vector Quantization Finite Scalar Quantization (VQ-FSQ) ของ Fish Speech v1.5 บน **Hugging Face Spaces Zero-cost Graphics Processing Unit (ZeroGPU)** และ **Google Colaboratory (Colab) Tesla T4 GPU** ในฟอร์แมต Half-Precision Floating-Point Format (FP16) ให้ความเร็วในการสังเคราะห์เสียงต่ำกว่า 1.5 วินาที
 
 ---
 
@@ -63,7 +67,7 @@ flowchart TD
     subgraph IngestionLayer ["1. Event Ingestion & Text Preprocessing"]
         TikTokLive["TikTok Live Broadcast (Live Chat & Virtual Gifts)"]
         Ingestion["TikTokLive WebSocket (WS) Ingestion Service"]
-        Normalizer["Thai Phonetic Normalizer & Profanity Filter"]
+        Normalizer["Thai Phonetic Normalizer & Profanity Regex Filter"]
         Queue["Priority First-In, First-Out (FIFO) Queue & Anti-Spam"]
 
         TikTokLive --> Ingestion
@@ -72,19 +76,19 @@ flowchart TD
     end
 
     subgraph TTSLayer ["2. Three-Tier Fallback Text-to-Speech (TTS) Engine"]
-        Queue -->|Tier 1: High Priority| ColabTTS["Google Colab Fish Speech v1.5 (Tesla T4 GPU & Cloudflare Tunnel)\nVoice: พิพัฒน์ บุญสิทธิเลิศ (FP16 Dual-AR)"]
-        ColabTTS -.->|Network Timeout / Offline Fallback| CloudTTS["Tier 2: Fish Audio Free Developer Cloud API"]
+        Queue -->|Tier 1: High Priority| ServerlessTTS["Hugging Face Spaces ZeroGPU / Google Colab T4 GPU\nFish Speech v1.5 (Dual-AR FP16 & Firefly-GAN VQ)\nVoice: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)"]
+        ServerlessTTS -.->|Network Timeout / Offline Fallback| CloudTTS["Tier 2: Fish Audio Free Developer Cloud API"]
         CloudTTS -.->|Quota Limit / Error Fallback| EdgeTTS["Tier 3: Microsoft Edge Neural TTS (th-TH-NiwatNeural)"]
     end
 
     subgraph AudioDeliveryLayer ["3. Real-Time Audio Delivery & Routing"]
-        ColabTTS --> AudioRouter["Audio Distribution Router"]
+        ServerlessTTS --> AudioRouter["Audio Distribution Router"]
         CloudTTS --> AudioRouter
         EdgeTTS --> AudioRouter
 
-        AudioRouter -->|Option A: TikFinity-Style Web Audio API| BrowserSource["TikTok Studio / OBS Browser Source Overlay\n(http://localhost:8000/overlay)"]
+        AudioRouter -->|Option A: TikFinity-Style Web Audio API| BrowserSource["TikTok Studio / OBS Browser Source Overlay\n(Render Cloud / Local Desktop: /overlay)"]
         AudioRouter -->|Option B: Local Virtual Audio Cable| VAC["VB-Audio Virtual Audio Cable (VAC) Input"]
-        AudioRouter -->|Option C: Local Dashboard Monitoring| Dashboard["Streamer Web Dashboard\n(http://localhost:8000)"]
+        AudioRouter -->|Option C: Web Dashboard Monitoring| Dashboard["Streamer Web Dashboard\n(/dashboard/<session_id>)"]
 
         BrowserSource --> Viewers["Live Stream Audience (Broadcast Audio)"]
         BrowserSource -.->|Monitor & Output| Headphones["Streamer Headphones (Audio Monitoring)"]
@@ -99,9 +103,42 @@ flowchart TD
 
 | Document | Description | Format | Target Audience |
 | :--- | :--- | :---: | :--- |
+| ☁️ [**Hugging Face ZeroGPU & Render Deployment Guide**](docs/HUGGINGFACE_RENDER_DEPLOYMENT_GUIDE.md) | คู่มือติดตั้งบนคลาวด์ฟรี 100% ($0/month) ด้วย Render Web Service ร่วมกับ Hugging Face Spaces ZeroGPU | Markdown | สตรีมเมอร์และนักพัฒนาที่ต้องการรันบนคลาวด์ตลอด 24 ชม. |
 | ⚡ [**Quick Start Guide (เริ่มสตรีมใน 60 วินาที)**](docs/QUICK_START.md) | สรุปขั้นตอนด่วน 1 หน้าจบ สำหรับเริ่มสตรีมทันที ตั้งค่า OBS / TikTok Studio | Markdown | สตรีมเมอร์ที่ต้องการเริ่มใช้งานทันที |
 | 📖 [**Official User Manual (คู่มือการใช้งานฉบับสมบูรณ์)**](docs/USER_MANUAL.md) | คู่มือภาษาไทยแบบละเอียด ตั้งค่า Browser Source, Advanced Audio, Dashboard & FAQ | Markdown | สตรีมเมอร์และผู้ดูแลระบบถ่ายทอดสด |
 | 🎙️ [**Google Colab Backend Guide**](colab/README.md) | คู่มือการรัน Fish Speech v1.5 บน Google Colab T4 GPU ฟรีผ่าน Cloudflare Tunnel | Markdown | นักพัฒนาและผู้ใช้งานขั้นสูง |
+
+---
+
+## ☁️ Zero-Cost Cloud Deployment (Hugging Face ZeroGPU + Render)
+
+ติดตั้งและปรับใช้ระบบบนระบบคลาวด์แบบไร้เซิร์ฟเวอร์ (Serverless) สมบูรณ์แบบ **ฟรี 100% ($0/เดือน)** โดยไม่ต้องเปิดคอมพิวเตอร์ทิ้งไว้ และไม่ต้องเสียค่าเช่า GPU รายชั่วโมง:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Deploy%20to%20Hugging%20Face-Spaces%20ZeroGPU-orange?style=for-the-badge&logo=huggingface&logoColor=white)](huggingface-space/)
+
+### 🚀 ขั้นตอนการติดตั้งด่วน (Quick Deployment Steps)
+
+1. **ติดตั้ง AI Inference Engine บน Hugging Face Spaces:**
+   * สร้าง New Space บน [Hugging Face Spaces](https://huggingface.co/new-space) $\rightarrow$ เลือก SDK เป็น **Gradio** และเลือกฮาร์ดแวร์ **ZeroGPU (Free)**
+   * อัปโหลดไฟล์จากโฟลเดอร์ `huggingface-space/` (ได้แก่ `README.md`, `app.py`, `requirements.txt`, `assets/yuta_sample.mp3`)
+   * คัดลอก Direct Application Programming Interface (API) URL เช่น: `https://<your_username>-<space_name>.hf.space`
+
+2. **ติดตั้ง Web Platform บน Render ด้วย 1-Click Blueprint:**
+   * กดปุ่ม **Deploy to Render** หรือสร้าง New Blueprint Instance บน [Render.com](https://render.com/) โดยชี้ไปที่คลังโค้ดนี้
+   * ไฟล์พิมพ์เขียว `render.yaml` จะสร้าง Web Service บน Python 3.11.9 และผูกพอร์ต `$PORT` ให้อัตโนมัติ
+   * ระบุตัวแปรสภาพแวดล้อม:
+     * `TIKTOK_USERNAME`: `@your_tiktok_username` (ระบบจะทำการเริ่มเชื่อมต่อห้องไลฟ์อัตโนมัติทันทีที่เซิร์ฟเวอร์บูต)
+     * `COLAB_TUNNEL_URL`: Direct API URL ของ Hugging Face Space จากข้อ 1
+     * `HF_TOKEN`: *(ทางเลือกเสริม)* Hugging Face Personal Access Token หาก Space เป็นแบบ Private
+     * `FISH_AUDIO_API_KEY`: *(ทางเลือกเสริม)* คีย์สำรอง Tier 2 จาก [fish.audio](https://fish.audio)
+   * กด **Apply** เพื่อเริ่มการทำงาน
+
+3. **นำ Overlay URL ไปใส่ใน OBS Studio หรือ TikTok LIVE Studio:**
+   * เข้าหน้าเว็บ Render ของคุณเพื่อคัดลอก Overlay URL หรือเปิด Streamer Web Dashboard
+   * เพิ่ม **Browser Source** ใน OBS Studio $\rightarrow$ วาง Overlay URL $\rightarrow$ ติ๊กถูก **Control Audio via OBS** และตั้งค่าเสียงเป็น **Monitor and Output**
+
+> 📖 อ่านคู่มือการติดตั้งบนคลาวด์ฉบับสมบูรณ์ พร้อมไดอะแกรมระบบและวิธีป้องกัน Render หลับได้ที่: [**HUGGINGFACE_RENDER_DEPLOYMENT_GUIDE.md**](docs/HUGGINGFACE_RENDER_DEPLOYMENT_GUIDE.md)
 
 ---
 
@@ -189,7 +226,7 @@ EMERGENCY_HOTKEY=f9
 
 ## 🧪 Testing & Automated Verification
 
-ระบบได้รับการพัฒนาภายใต้ระเบียบวิธี Test-Driven Development (TDD) ครอบคลุม Unit Tests, Contract Tests, WebSocket Tests และ End-to-End Pipeline Verification รวมทั้งสิ้น 152 การทดสอบ:
+ระบบได้รับการพัฒนาภายใต้ระเบียบวิธี Test-Driven Development (TDD) ครอบคลุม Unit Tests, Contract Tests, WebSocket Tests และ End-to-End Pipeline Verification รวมทั้งสิ้น 179 การทดสอบ:
 
 ```powershell
 # รันการทดสอบทั้งหมดผ่าน pytest
@@ -200,12 +237,14 @@ pytest tests/ -v
 
 ## 📚 References & Academic Standards
 
-1. **Fish Audio Research Team.** (2024). *Fish Speech: Open-Source Dual-AR and VQ-GAN Speech Synthesis System Architecture*. Fish Audio Inc. [https://fish.audio](https://fish.audio)
-2. **Microsoft Azure Cognitive Services.** (2024). *Microsoft Edge Neural Text-to-Speech (TTS) Voice Roster and Synthesizer Engine Specification*. Microsoft Corporation. [https://learn.microsoft.com/azure/ai-services/speech-service/](https://learn.microsoft.com/azure/ai-services/speech-service/)
-3. **World Wide Web Consortium (W3C).** (2024). *Web Audio API Standard Specification*. W3C Audio Working Group. [https://www.w3.org/TR/webaudio/](https://www.w3.org/TR/webaudio/)
-4. **Cloudflare Inc.** (2025). *Cloudflare Tunnel: Zero-Trust Connect and Ingress Architecture*. Cloudflare Network Systems. [https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
-5. **Open Broadcaster Software Community.** (2024). *OBS Studio Browser Source and Audio Routing Integration Guide*. OBS Project. [https://obsproject.com/](https://obsproject.com/)
-6. **VB-Audio Software.** (2024). *VB-Audio Virtual Cable Specification and Inter-Process Audio Routing Architecture*. [https://vb-audio.com/Cable/](https://vb-audio.com/Cable/)
+1. **Fish Audio Research Team.** (2024). *Fish Speech: Advancing Open-Source Multilingual Text-to-Speech Synthesis via Dual-Autoregressive Modeling and Vector Quantization*. arXiv preprint arXiv:2411.01156. [https://arxiv.org/abs/2411.01156](https://arxiv.org/abs/2411.01156)
+2. **Hugging Face Inc.** (2024). *Hugging Face Spaces ZeroGPU: Dynamic Hardware Scheduling for Accelerated AI Applications*. Hugging Face Documentation. [https://huggingface.co/docs/hub/spaces-gpus](https://huggingface.co/docs/hub/spaces-gpus)
+3. **Render Services Inc.** (2024). *Render Infrastructure as Code: Blueprint Specification and Deployment Architecture*. Render Documentation. [https://render.com/docs/blueprint-spec](https://render.com/docs/blueprint-spec)
+4. **Microsoft Azure Cognitive Services.** (2024). *Microsoft Edge Neural Text-to-Speech (TTS) Voice Roster and Synthesizer Engine Specification*. Microsoft Corporation. [https://learn.microsoft.com/azure/ai-services/speech-service/](https://learn.microsoft.com/azure/ai-services/speech-service/)
+5. **World Wide Web Consortium (W3C).** (2024). *Web Audio API Standard Specification*. W3C Audio Working Group. [https://www.w3.org/TR/webaudio/](https://www.w3.org/TR/webaudio/)
+6. **Cloudflare Inc.** (2025). *Cloudflare Tunnel: Zero-Trust Connect and Ingress Architecture*. Cloudflare Network Systems. [https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+7. **Open Broadcaster Software Community.** (2024). *OBS Studio Browser Source and Audio Routing Integration Guide*. OBS Project. [https://obsproject.com/](https://obsproject.com/)
+8. **VB-Audio Software.** (2024). *VB-Audio Virtual Cable Specification and Inter-Process Audio Routing Architecture*. [https://vb-audio.com/Cable/](https://vb-audio.com/Cable/)
 
 ---
 
