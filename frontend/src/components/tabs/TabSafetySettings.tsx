@@ -16,6 +16,21 @@ export interface TabSafetySettingsProps {
   onUpdate: (partial: Partial<TikFinitySettings>) => void;
 }
 
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function parseCommaSeparated(val: string): string[] {
+  return val
+    .split(",")
+    .map((w) => w.trim())
+    .filter((w) => w.length > 0);
+}
+
 export function TabSafetySettings({
   settings,
   onUpdate,
@@ -27,30 +42,43 @@ export function TabSafetySettings({
     settings.blacklistedUsers.join(", ")
   );
 
-  // Sync state if settings change externally
+  // Sync state ONLY if incoming settings differ from current parsed content
+  // to prevent trailing commas and spaces from being swallowed during typing.
   useEffect(() => {
-    setBannedInput(settings.bannedWords.join(", "));
-  }, [settings.bannedWords]);
+    const currentParsed = parseCommaSeparated(bannedInput);
+    if (!arraysEqual(currentParsed, settings.bannedWords)) {
+      setBannedInput(settings.bannedWords.join(", "));
+    }
+  }, [settings.bannedWords]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setBlacklistInput(settings.blacklistedUsers.join(", "));
-  }, [settings.blacklistedUsers]);
+    const currentParsed = parseCommaSeparated(blacklistInput);
+    if (!arraysEqual(currentParsed, settings.blacklistedUsers)) {
+      setBlacklistInput(settings.blacklistedUsers.join(", "));
+    }
+  }, [settings.blacklistedUsers]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBannedChange = (val: string) => {
     setBannedInput(val);
-    const parsed = val
-      .split(",")
-      .map((w) => w.trim())
-      .filter((w) => w.length > 0);
+    const parsed = parseCommaSeparated(val);
+    onUpdate({ bannedWords: parsed });
+  };
+
+  const handleBannedBlur = () => {
+    const parsed = parseCommaSeparated(bannedInput);
+    setBannedInput(parsed.join(", "));
     onUpdate({ bannedWords: parsed });
   };
 
   const handleBlacklistChange = (val: string) => {
     setBlacklistInput(val);
-    const parsed = val
-      .split(",")
-      .map((u) => u.trim())
-      .filter((u) => u.length > 0);
+    const parsed = parseCommaSeparated(val);
+    onUpdate({ blacklistedUsers: parsed });
+  };
+
+  const handleBlacklistBlur = () => {
+    const parsed = parseCommaSeparated(blacklistInput);
+    setBlacklistInput(parsed.join(", "));
     onUpdate({ blacklistedUsers: parsed });
   };
 
@@ -69,6 +97,7 @@ export function TabSafetySettings({
           rows={4}
           value={bannedInput}
           onChange={(e) => handleBannedChange(e.target.value)}
+          onBlur={handleBannedBlur}
           placeholder="พิมพ์คำที่ห้ามอ่าน โดยคั่นด้วยเครื่องหมายจุลภาค (,) เช่น คำด่า, คำหยาบ, การเมือง..."
           className="w-full bg-[#12141a] border border-[#1e222d] text-slate-100 rounded-lg p-3 text-sm focus:border-[#fe2c55] focus:outline-none transition-colors resize-none leading-relaxed"
         />
@@ -90,6 +119,7 @@ export function TabSafetySettings({
           rows={3}
           value={blacklistInput}
           onChange={(e) => handleBlacklistChange(e.target.value)}
+          onBlur={handleBlacklistBlur}
           placeholder="ระบุ @username ที่ต้องการตัดสิทธิ์การอ่าน TTS คั่นด้วยจุลภาค"
           className="w-full bg-[#12141a] border border-[#1e222d] text-slate-100 rounded-lg p-3 text-sm focus:border-[#fe2c55] focus:outline-none transition-colors resize-none leading-relaxed"
         />
