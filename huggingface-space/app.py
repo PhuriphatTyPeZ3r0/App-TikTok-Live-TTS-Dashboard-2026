@@ -49,11 +49,13 @@ try:
 except ImportError:
     has_spaces = False
 
-    def spaces_gpu(duration: int = 30):
-        """Fallback no-op decorator when spaces package is unavailable."""
+    def spaces_gpu(func=None, *, duration: int = 30):
+        """Fallback no-op decorator when spaces package is unavailable.
+        Supports both @spaces_gpu and @spaces_gpu(duration=30) syntax.
+        """
         def decorator(fn):
             return fn
-        return decorator
+        return decorator(func) if callable(func) else decorator
 
     logger.info("Standard runtime detected. Operating with no-op spaces.GPU fallback.")
 
@@ -105,12 +107,12 @@ class FishSpeechEngine:
         """Check hardware accelerator and attempt to initialize real Fish Speech models."""
         try:
             import torch
-            self.gpu_available = torch.cuda.is_available()
+            self.gpu_available = torch.cuda.is_available() or has_spaces
         except ImportError:
-            self.gpu_available = False
+            self.gpu_available = has_spaces
 
-        if not self.gpu_available and not has_spaces:
-            logger.info("CUDA GPU is not available. Operating in mock/test mode.")
+        if not self.gpu_available:
+            logger.info("CUDA GPU / ZeroGPU is not available. Operating in mock/test mode.")
             return
 
         try:
@@ -141,7 +143,7 @@ class FishSpeechEngine:
                 logger.info("Checkpoint dir %s does not exist. Using mock/test mode.", checkpoint_dir)
                 return
 
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = "cuda" if (torch.cuda.is_available() or has_spaces) else "cpu"
             logger.info("Loading Fish Speech v1.5 models from %s onto %s...", checkpoint_dir, device)
 
             from hydra import compose, initialize
@@ -295,13 +297,22 @@ class FishSpeechEngine:
     @spaces_gpu(duration=30)
     def _synthesize_zerogpu(self, text: str) -> bytes:
         """Inference worker dynamically allocated on Hugging Face Spaces ZeroGPU."""
-        import torch
-        import soundfile as sf
-        import numpy as np
+        try:
+            import torch
+            cuda_avail = torch.cuda.is_available()
+        except ImportError:
+            torch = None
+            cuda_avail = False
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = "cuda" if (cuda_avail or has_spaces) else "cpu"
         if self.llama_model is None or self.decoder_model is None:
             return self._synthesize_mock(text)
+
+        if self.prompt_tokens is None:
+            self._prepare_prompt(device)
+
+        import soundfile as sf
+        import numpy as np
 
         kwargs = {
             "model": self.llama_model,
@@ -460,6 +471,7 @@ def build_gradio_ui(inference_engine: FishSpeechEngine):
     if gr is None:
         return None
 
+    @spaces_gpu(duration=30)
     def gradio_synthesize(text: str, voice_option: str):
         if not text or not text.strip():
             return None

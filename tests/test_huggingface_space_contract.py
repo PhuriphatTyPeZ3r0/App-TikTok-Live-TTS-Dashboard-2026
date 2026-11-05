@@ -125,22 +125,51 @@ def test_websocket_tts_streaming(client: TestClient):
 
 
 def test_zero_gpu_spaces_decorator_compatibility(hf_module):
-    """Verify spaces.GPU decorator integration or graceful fallback."""
+    """Verify spaces.GPU decorator integration supporting both parameterized and non-parameterized syntax."""
     engine = hf_module.engine
     # Synthesize should execute smoothly regardless of whether spaces is active or fallback
     audio = engine.synthesize("ทดสอบ ZeroGPU Decorator", reference_id="phiphat")
     assert isinstance(audio, bytes)
     assert len(audio) > 0
 
-    # Ensure spaces.GPU is callable and wraps functions cleanly
-    mock_spaces_gpu = hf_module.spaces_gpu(duration=30)
-    assert callable(mock_spaces_gpu)
-
-    @mock_spaces_gpu
-    def dummy_inference(val: int) -> int:
+    # 1. Parameterized syntax @spaces_gpu(duration=30)
+    @hf_module.spaces_gpu(duration=30)
+    def dummy_param_inference(val: int) -> int:
         return val * 2
 
-    assert dummy_inference(21) == 42
+    assert dummy_param_inference(21) == 42
+
+    # 2. Non-parameterized syntax @spaces_gpu
+    @hf_module.spaces_gpu
+    def dummy_non_param_inference(val: int) -> int:
+        return val + 10
+
+    assert dummy_non_param_inference(5) == 15
+
+
+def test_zerogpu_device_resolution_and_lazy_prompt(hf_module, monkeypatch):
+    """Verify that ZeroGPU enables gpu_available flag and triggers lazy prompt encoding."""
+    # Test device resolution when has_spaces is True
+    monkeypatch.setattr(hf_module, "has_spaces", True)
+    test_engine = hf_module.FishSpeechEngine(checkpoint_dir=Path("non_existent_checkpoints"))
+    assert test_engine.gpu_available is True
+
+    # Test lazy prompt encoding in _synthesize_zerogpu
+    prepared_calls = []
+    test_engine.llama_model = "mock_llama"
+    test_engine.decoder_model = "mock_decoder"
+    test_engine.prompt_tokens = None
+    test_engine.generate_long_fn = lambda **kw: iter([])
+    monkeypatch.setattr(test_engine, "_prepare_prompt", lambda dev: prepared_calls.append(dev))
+
+    # Calling _synthesize_zerogpu when prompt_tokens is None should invoke _prepare_prompt
+    try:
+        test_engine._synthesize_zerogpu("ข้อความทดสอบ lazy prompt")
+    except Exception:
+        pass
+
+    assert len(prepared_calls) == 1
+    assert prepared_calls[0] in ("cuda", "cpu")
 
 
 def test_gradio_demo_contract(hf_module):
