@@ -98,10 +98,20 @@
         try {
           const payload = JSON.parse(event.data);
 
-          // Handle Emergency Flush
-          if (payload.type === 'CONTROL_FLUSH') {
-            console.log('[OBS Overlay] Emergency CONTROL_FLUSH received. Clearing audio queue.');
+          // Handle Stop / Emergency Flush
+          if (payload.type === 'CONTROL_FLUSH' || payload.type === 'STOP_AUDIO') {
+            console.log('[OBS Overlay] Stop/Flush received. Halting audio.');
             audioPlayer.flush();
+            return;
+          }
+
+          // Handle Pause / Resume
+          if (payload.type === 'PAUSE_AUDIO') {
+            audioPlayer.pause?.();
+            return;
+          }
+          if (payload.type === 'RESUME_AUDIO') {
+            audioPlayer.resume?.();
             return;
           }
 

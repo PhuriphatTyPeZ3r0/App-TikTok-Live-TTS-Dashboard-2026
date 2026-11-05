@@ -941,6 +941,10 @@ async def websocket_dashboard_endpoint(websocket: WebSocket, session_id: str) ->
     - toggle_comments: enable or disable regular chat speech synthesis.
     - toggle_gifts: enable or disable virtual gift announcement synthesis.
     - emergency_flush: purge pending queue items and dispatch CONTROL_FLUSH.
+    - control_skip: skip currently playing speech, clear queue, and dispatch STOP_AUDIO.
+    - control_clear: purge pending queue items and dispatch STOP_AUDIO.
+    - control_pause: suspend overlay audio playback and dispatch PAUSE_AUDIO.
+    - control_resume: resume overlay audio playback and dispatch RESUME_AUDIO.
 
     Args:
         websocket: FastAPI WebSocket connection instance.
@@ -979,6 +983,15 @@ async def websocket_dashboard_endpoint(websocket: WebSocket, session_id: str) ->
             elif action == "emergency_flush":
                 session.queue_manager.clear_queue()
                 await broadcast_flush(session_id)
+            elif action in ("control_skip", "control_clear"):
+                session.queue_manager.clear_queue()
+                stop_msg = {"type": "STOP_AUDIO", "action": action}
+                await broadcast_to_overlays(session.session_id, stop_msg)
+                await broadcast_to_dashboards(session.session_id, stop_msg)
+            elif action == "control_pause":
+                await broadcast_to_overlays(session.session_id, {"type": "PAUSE_AUDIO"})
+            elif action == "control_resume":
+                await broadcast_to_overlays(session.session_id, {"type": "RESUME_AUDIO"})
     except WebSocketDisconnect:
         pass
     except Exception as exc:
