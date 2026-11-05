@@ -64,6 +64,12 @@ export function AudioVisualizer({
     speakingRef.current = isSpeaking;
   }, [isSpeaking]);
 
+  // Track dynamic accent color in a ref for fluid canvas gradient & glow updates
+  const accentRef = useRef<string>(accentColor);
+  useEffect(() => {
+    accentRef.current = accentColor;
+  }, [accentColor]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -82,8 +88,8 @@ export function AudioVisualizer({
     // Dynamic resolution handling accounting for High-DPI screens (e.g. Retina displays)
     const updateCanvasDimensions = () => {
       const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
-      const rect = container.getBoundingClientRect();
-      const logicalWidth = Math.max(rect.width, 200);
+      // Account for container horizontal padding (p-4 = 32px total) to prevent bar clipping
+      const logicalWidth = Math.max((container.clientWidth || container.getBoundingClientRect().width) - 32, 200);
       const logicalHeight = height;
 
       canvas.width = Math.floor(logicalWidth * dpr);
@@ -91,8 +97,8 @@ export function AudioVisualizer({
       canvas.style.width = `${logicalWidth}px`;
       canvas.style.height = `${logicalHeight}px`;
 
-      ctx.resetTransform?.();
-      ctx.scale(dpr, dpr);
+      // Atomic transform matrix reset & scale for crisp High-DPI canvas rendering
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
     updateCanvasDimensions();
@@ -132,11 +138,12 @@ export function AudioVisualizer({
         }
 
         const totalSpacing = 4;
-        const availableWidth = logicalWidth - 24; // padding
+        const availableWidth = logicalWidth - 16; // Inset safely to avoid boundary clipping
         const barWidth = Math.max(2, (availableWidth - (barCount - 1) * totalSpacing) / barCount);
-        const startX = 12;
+        const startX = 8;
         const baselineY = logicalHeight - 16;
         const maxBarHeight = logicalHeight - 32;
+        const currentAccent = accentRef.current || "#00f2fe";
 
         // Draw frequency spectrum bars with Apple visionOS gradient
         for (let i = 0; i < barCount; i++) {
@@ -145,7 +152,7 @@ export function AudioVisualizer({
           const y = baselineY - barHeight;
 
           const gradient = ctx.createLinearGradient(x, baselineY, x, y);
-          gradient.addColorStop(0, "#00f2fe"); // TikTok Cyan
+          gradient.addColorStop(0, currentAccent); // Dynamic accent stop (defaults to TikTok Cyan #00f2fe)
           gradient.addColorStop(0.5, "#8b5cf6"); // Violet Accent
           gradient.addColorStop(1, "#fe2c55"); // TikTok Red Highlight
 
@@ -180,7 +187,7 @@ export function AudioVisualizer({
 
         ctx.strokeStyle = ribbonGrad;
         ctx.lineWidth = 2.5;
-        ctx.shadowColor = "#00f2fe";
+        ctx.shadowColor = currentAccent; // Dynamic accent glow (defaults to #00f2fe)
         ctx.shadowBlur = 10;
         ctx.stroke();
         ctx.restore();
@@ -253,17 +260,19 @@ export function AudioVisualizer({
         <div className="flex items-center gap-2">
           <span
             className={`inline-block w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-              isSpeaking
-                ? "bg-[#00f2fe] shadow-[0_0_8px_#00f2fe] animate-pulse"
-                : "bg-white/30"
+              isSpeaking ? "animate-pulse" : "bg-white/30"
             }`}
+            style={{
+              backgroundColor: isSpeaking ? (accentColor || "#00f2fe") : undefined,
+              boxShadow: isSpeaking ? `0 0 8px ${accentColor || "#00f2fe"}` : undefined,
+            }}
           />
           <span className="text-xs font-semibold tracking-wider uppercase text-white/70">
             {isSpeaking ? "Voice Synthesizer Active" : "Spectral Monitor Idle"}
           </span>
         </div>
         <div className="text-[10px] text-white/40 tracking-widest font-mono uppercase">
-          HD Audio · FFT 36-Band
+          HD Audio · FFT {barCount}-Band
         </div>
       </div>
 

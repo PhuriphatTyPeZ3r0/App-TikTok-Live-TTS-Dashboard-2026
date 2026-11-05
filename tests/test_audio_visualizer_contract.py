@@ -63,12 +63,18 @@ def test_canvas_lifecycle_and_high_dpi_rendering():
     # High-DPI & Resize handling
     assert "devicePixelRatio" in content, "Must account for window.devicePixelRatio for crisp High-DPI rendering"
     assert "ResizeObserver" in content, "Must use ResizeObserver for dynamic container responsiveness"
+    assert "setTransform" in content or "scale" in content, "Must scale context for high-DPI rendering"
+    assert "clientWidth" in content or "getBoundingClientRect" in content, "Must measure container width safely"
 
 
 def test_visualizer_state_rendering_modes():
-    """Verify active speaking frequency spectrum and idle breathing wave modes."""
+    """Verify active speaking frequency spectrum, accent color ref, and idle breathing wave modes."""
     assert COMPONENT_FILE.exists(), f"Missing visualizer component at {COMPONENT_FILE}"
     content = COMPONENT_FILE.read_text(encoding="utf-8")
+
+    # Dynamic accent tracking
+    assert "accentRef" in content, "Must track accentColor in a ref for fluid updates"
+    assert "barCount" in content, "Must dynamically bind barCount"
 
     # Dynamic frequency bars and gradient
     assert "createLinearGradient" in content or "gradient" in content
