@@ -12,7 +12,7 @@ pinned: false
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1f4t-Q0H9QRwQwK4XlJS_DHwfsRPkEMz1)
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces%20ZeroGPU-orange?style=for-the-badge&logo=huggingface&logoColor=white)](huggingface-space/)
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PhuriphatTyPeZ3r0/tiktok-live-tts-bot)
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-179%20passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
@@ -114,7 +114,7 @@ flowchart TD
 
 ติดตั้งและปรับใช้ระบบบนระบบคลาวด์แบบไร้เซิร์ฟเวอร์ (Serverless) สมบูรณ์แบบ **ฟรี 100% ($0/เดือน)** โดยไม่ต้องเปิดคอมพิวเตอร์ทิ้งไว้ และไม่ต้องเสียค่าเช่า GPU รายชั่วโมง:
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PhuriphatTyPeZ3r0/tiktok-live-tts-bot)
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Deploy%20to%20Hugging%20Face-Spaces%20ZeroGPU-orange?style=for-the-badge&logo=huggingface&logoColor=white)](huggingface-space/)
 
 ### 🚀 ขั้นตอนการติดตั้งด่วน (Quick Deployment Steps)

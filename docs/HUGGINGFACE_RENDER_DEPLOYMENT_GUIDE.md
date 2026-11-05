@@ -132,9 +132,14 @@ git push origin main
    https://<YOUR_HF_USERNAME>-<YOUR_SPACE_NAME>.hf.space
    ```
 4. ทดสอบความพร้อมผ่านเบราว์เซอร์หรือเครื่องมือ cURL:
-   ```bash
-   curl -s https://<YOUR_HF_USERNAME>-<YOUR_SPACE_NAME>.hf.space/health
-   ```
+   - **สำหรับ Public Space:**
+     ```bash
+     curl -s https://<YOUR_HF_USERNAME>-<YOUR_SPACE_NAME>.hf.space/health
+     ```
+   - **สำหรับ Private Space (แนบ Bearer Token):**
+     ```bash
+     curl -s -H "Authorization: Bearer $HF_TOKEN" https://<YOUR_HF_USERNAME>-<YOUR_SPACE_NAME>.hf.space/health
+     ```
    ผลลัพธ์ที่ถูกต้องจะส่งรหัสสถานะ Hypertext Transfer Protocol (HTTP) 200 พร้อม JSON:
    ```json
    {
