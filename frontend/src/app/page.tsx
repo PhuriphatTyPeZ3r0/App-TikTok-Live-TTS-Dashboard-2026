@@ -27,7 +27,7 @@ import { useDashboardSocket } from "../hooks/useDashboardSocket";
 import { normalizeTtsText, isUserOnCooldown } from "../lib/textUtils";
 import type { QueueItem } from "../types/tikfinity";
 import type { DashboardEvent } from "../types/dashboard";
-import { Radio, Sparkles, UserPlus, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 function TikFinityDashboardContent() {
   const searchParams = useSearchParams();
@@ -71,6 +71,25 @@ function TikFinityDashboardContent() {
   // In-memory spam throttling and user cooldown map
   const userCooldownMap = useRef(new Map<string, number>());
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Playback execution generation ID and inflight fetch abort controller
+  const currentPlayIdRef = useRef<number>(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      currentPlayIdRef.current += 1;
+      abortControllerRef.current?.abort();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Sync refs to avoid stale closures in event listeners
   const settingsRef = useRef(settings);
@@ -236,6 +255,8 @@ function TikFinityDashboardContent() {
 
     // 3. Emergency Queue Flush (CONTROL_FLUSH)
     if (eventType === "CONTROL_FLUSH") {
+      currentPlayIdRef.current += 1;
+      abortControllerRef.current?.abort();
       setQueue([]);
       if (audioRef.current) {
         audioRef.current.pause();
@@ -279,16 +300,24 @@ function TikFinityDashboardContent() {
     setCurrentSpeaker(nextItem);
     setIsPlaying(true);
 
-    let isCancelled = false;
+    // Increment play ID for this specific playback turn
+    currentPlayIdRef.current += 1;
+    const thisPlayId = currentPlayIdRef.current;
+
+    // Abort any prior inflight fetch and create a new AbortController
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     async function executeSpeech() {
       const currentSettings = settingsRef.current;
+      const isStale = () => currentPlayIdRef.current !== thisPlayId;
 
       // In-Dashboard Audio disabled: Let OBS Overlay perform audio playback
       if (!currentSettings.inDashboardAudio) {
         const simulatedMs = Math.max(2500, Math.min(10000, nextItem.text.length * 120));
         setTimeout(() => {
-          if (!isCancelled) {
+          if (!isStale()) {
             setIsPlaying(false);
             setCurrentSpeaker(null);
           }
@@ -305,6 +334,7 @@ function TikFinityDashboardContent() {
 
         const res = await fetch(targetUrl, {
           method: "POST",
+          signal: controller.signal,
           headers: {
             "Content-Type": "application/json",
             "X-Admin-Token": adminToken || "",
@@ -318,15 +348,18 @@ function TikFinityDashboardContent() {
           }),
         });
 
+        // Discard result if skipped or superseded while fetch was inflight
+        if (isStale()) return;
+
         if (res.ok) {
           const data = await res.json();
-          if (data.audio_base64 && !isCancelled) {
+          if (data.audio_base64 && !isStale()) {
             const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
             audio.volume = Math.max(0, Math.min(1, currentSettings.volume));
             audioRef.current = audio;
 
             audio.onended = () => {
-              if (!isCancelled) {
+              if (!isStale()) {
                 audioRef.current = null;
                 setIsPlaying(false);
                 setCurrentSpeaker(null);
@@ -334,7 +367,7 @@ function TikFinityDashboardContent() {
             };
 
             audio.onerror = () => {
-              if (!isCancelled) {
+              if (!isStale()) {
                 audioRef.current = null;
                 setIsPlaying(false);
                 setCurrentSpeaker(null);
@@ -345,25 +378,30 @@ function TikFinityDashboardContent() {
             return;
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === "AbortError" || isStale()) {
+          return;
+        }
         console.warn("[TikFinity Dashboard] Remote audio synthesis failed, using Web Speech fallback:", err);
       }
 
+      if (isStale()) return;
+
       // Fallback: Web Speech API synthesis in browser
-      if (typeof window !== "undefined" && "speechSynthesis" in window && !isCancelled) {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
         const utterance = new SpeechSynthesisUtterance(nextItem.text);
         utterance.lang = "th-TH";
         utterance.volume = Math.max(0, Math.min(1, currentSettings.volume));
 
         utterance.onend = () => {
-          if (!isCancelled) {
+          if (!isStale()) {
             setIsPlaying(false);
             setCurrentSpeaker(null);
           }
         };
 
         utterance.onerror = () => {
-          if (!isCancelled) {
+          if (!isStale()) {
             setIsPlaying(false);
             setCurrentSpeaker(null);
           }
@@ -376,7 +414,7 @@ function TikFinityDashboardContent() {
       // Safe fallback timer
       const fallbackMs = Math.max(2500, nextItem.text.length * 100);
       setTimeout(() => {
-        if (!isCancelled) {
+        if (!isStale()) {
           setIsPlaying(false);
           setCurrentSpeaker(null);
         }
@@ -384,14 +422,15 @@ function TikFinityDashboardContent() {
     }
 
     executeSpeech();
-
-    return () => {
-      isCancelled = true;
-    };
+    // Decoupled: incoming queue changes must NOT cancel the active playback completion handler
   }, [isPlaying, isPaused, queue, backendUrl, sessionId, adminToken]);
 
   // Streamer Control Actions
   const handleSkip = useCallback(() => {
+    // Invalidate active or inflight playback turn immediately
+    currentPlayIdRef.current += 1;
+    abortControllerRef.current?.abort();
+
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -425,8 +464,21 @@ function TikFinityDashboardContent() {
   }, [pauseAudio, resumeAudio]);
 
   const handleClearQueue = useCallback(() => {
+    // Invalidate active or inflight playback turn immediately
+    currentPlayIdRef.current += 1;
+    abortControllerRef.current?.abort();
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setQueue([]);
     wsClearQueue();
+    setIsPlaying(false);
+    setCurrentSpeaker(null);
   }, [wsClearQueue]);
 
   const handleDeleteItem = useCallback((id: string) => {
