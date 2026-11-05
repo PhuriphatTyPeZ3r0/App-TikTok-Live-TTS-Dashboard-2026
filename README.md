@@ -13,9 +13,10 @@ pinned: false
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1f4t-Q0H9QRwQwK4XlJS_DHwfsRPkEMz1)
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces%20ZeroGPU-orange?style=for-the-badge&logo=huggingface&logoColor=white)](huggingface-space/)
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/PhuriphatTyPeZ3r0/tiktok-live-tts-bot)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/PhuriphatTyPeZ3r0/tiktok-live-tts-bot&root-directory=frontend)
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-179%20passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-212%20passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Cloudflare Tunnel](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 
@@ -103,10 +104,27 @@ flowchart TD
 
 | Document | Description | Format | Target Audience |
 | :--- | :--- | :---: | :--- |
+| 💎 [**Vercel & Render Decoupled Deployment Guide**](docs/VERCEL_RENDER_DEPLOYMENT_GUIDE.md) | คู่มือติดตั้ง Next.js 15 Apple Liquid Glass Dashboard บน Vercel Edge CDN คู่กับ Render Backend ฟรี 100% | Markdown | สตรีมเมอร์และนักพัฒนาที่ต้องการแดชบอร์ดระดับพรีเมียม |
 | ☁️ [**Hugging Face ZeroGPU & Render Deployment Guide**](docs/HUGGINGFACE_RENDER_DEPLOYMENT_GUIDE.md) | คู่มือติดตั้งบนคลาวด์ฟรี 100% ($0/month) ด้วย Render Web Service ร่วมกับ Hugging Face Spaces ZeroGPU | Markdown | สตรีมเมอร์และนักพัฒนาที่ต้องการรันบนคลาวด์ตลอด 24 ชม. |
 | ⚡ [**Quick Start Guide (เริ่มสตรีมใน 60 วินาที)**](docs/QUICK_START.md) | สรุปขั้นตอนด่วน 1 หน้าจบ สำหรับเริ่มสตรีมทันที ตั้งค่า OBS / TikTok Studio | Markdown | สตรีมเมอร์ที่ต้องการเริ่มใช้งานทันที |
 | 📖 [**Official User Manual (คู่มือการใช้งานฉบับสมบูรณ์)**](docs/USER_MANUAL.md) | คู่มือภาษาไทยแบบละเอียด ตั้งค่า Browser Source, Advanced Audio, Dashboard & FAQ | Markdown | สตรีมเมอร์และผู้ดูแลระบบถ่ายทอดสด |
 | 🎙️ [**Google Colab Backend Guide**](colab/README.md) | คู่มือการรัน Fish Speech v1.5 บน Google Colab T4 GPU ฟรีผ่าน Cloudflare Tunnel | Markdown | นักพัฒนาและผู้ใช้งานขั้นสูง |
+
+---
+
+## 💎 Apple Liquid Glass Streamer Dashboard (Next.js 15 + Vercel)
+
+แดชบอร์ดควบคุมการสตรีมสดระดับพรีเมียม ออกแบบตามหลักปรัชญา **Apple visionOS Frosted Liquid Glass Design System** พัฒนาขึ้นด้วยเทคโนโลยี **Next.js 15 (App Router)**, **React 19**, **Tailwind CSS**, และ **Framer Motion** ส่งมอบผ่านเครือข่ายกระจายเนื้อหา **Content Delivery Network (CDN)** ระดับโลกของ **Vercel** แบบไร้ค่าใช้จ่าย ($0/month):
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/PhuriphatTyPeZ3r0/tiktok-live-tts-bot&root-directory=frontend)
+
+- **Decoupled Architecture:** ทำงานเป็น **Single-Page Application (SPA)** แยกจาก Backend อิสระ โดยเชื่อมต่อผ่าน WebSocket ความเร็วสูงไปยัง FastAPI บน Render
+- **Audio Spectrum & Waveform Visualizer:** แสดงภาพคลื่นเสียงแบบเรียลไทม์ผ่าน **Web Audio Application Programming Interface (Web Audio API)** และ HTML5 Canvas
+- **Bento Grid Control Panel:** จัดการระดับเสียง (Master Volume), สวิตช์ปิด/เปิดการอ่านคอมเมนต์หรือของขวัญ, การทดสอบเสียงพากย์ของ **พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)**, และปุ่มหยุดฉุกเฉิน Panic Button (`CONTROL_FLUSH`)
+- **Priority Queue Live Feed:** แสดงรายการคิวคอมเมนต์และของขวัญสดตามลำดับความสำคัญ First-In, First-Out (FIFO) พร้อมระบบป้ายทอง VIP Gift Badges
+- **1-Click OBS Studio Integration:** คัดลอก Overlay URL ไปวางใน Open Broadcaster Software (OBS) Studio หรือ TikTok LIVE Studio ได้ทันที
+
+> 📖 อ่านคู่มือการติดตั้งแบบละเอียดพร้อมไดอะแกรมระบบได้ที่: [**docs/VERCEL_RENDER_DEPLOYMENT_GUIDE.md**](docs/VERCEL_RENDER_DEPLOYMENT_GUIDE.md)
 
 ---
 
@@ -226,7 +244,7 @@ EMERGENCY_HOTKEY=f9
 
 ## 🧪 Testing & Automated Verification
 
-ระบบได้รับการพัฒนาภายใต้ระเบียบวิธี Test-Driven Development (TDD) ครอบคลุม Unit Tests, Contract Tests, WebSocket Tests และ End-to-End Pipeline Verification รวมทั้งสิ้น 179 การทดสอบ:
+ระบบได้รับการพัฒนาภายใต้ระเบียบวิธี Test-Driven Development (TDD) ครอบคลุม Unit Tests, Contract Tests, WebSocket Tests และ End-to-End Pipeline Verification รวมทั้งสิ้น 212 การทดสอบ:
 
 ```powershell
 # รันการทดสอบทั้งหมดผ่าน pytest
