@@ -122,7 +122,14 @@ function RedBroadcastCockpitContent() {
     autoDiscoverSession();
   }, [backendUrl, sessionId, adminToken]);
 
-  // Real-time WebSocket hook
+  // Real-time WebSocket hook with lazy activation upon session discovery
+  const isSessionValid = Boolean(
+    sessionId &&
+    adminToken &&
+    sessionId !== "default_session" &&
+    adminToken !== "admin_token"
+  );
+
   const {
     isConnected,
     isReconnecting,
@@ -136,9 +143,10 @@ function RedBroadcastCockpitContent() {
     updateColabSettings,
     skipItem,
   } = useDashboardSocket({
-    sessionId: sessionId || "default_session",
-    adminToken: adminToken || "admin_token",
+    sessionId: isSessionValid ? sessionId : "",
+    adminToken: isSessionValid ? adminToken : "",
     backendUrl,
+    enabled: isSessionValid,
   });
 
   // Handle creating a new live session

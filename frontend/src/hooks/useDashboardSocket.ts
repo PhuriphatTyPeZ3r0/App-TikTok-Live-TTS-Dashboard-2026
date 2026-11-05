@@ -164,8 +164,8 @@ export function useDashboardSocket({
    * Establish WebSocket (WS) connection with exponential backoff fault recovery.
    */
   const connect = useCallback(() => {
-    if (!sessionId || !adminToken) {
-      setError("Missing sessionId or adminToken for WebSocket authorization");
+    if (!sessionId || !adminToken || sessionId === "default_session" || adminToken === "admin_token") {
+      // Standby: wait for active session discovery before opening WebSocket
       return;
     }
 
@@ -411,39 +411,26 @@ export function useDashboardSocket({
     async (text?: string): Promise<boolean> => {
       try {
         const payload = {
-          sessionId,
-          adminToken,
+          sessionId: sessionId && sessionId !== "default_session" ? sessionId : undefined,
+          adminToken: adminToken && adminToken !== "admin_token" ? adminToken : undefined,
           text: text || "ทดสอบระบบเสียงสังเคราะห์ ติ๊กต็อกไลฟ์สำเร็จ",
         };
 
-        // Try primary brief endpoint: /api/session/test-voice
-        const endpointPrimary = `${backendUrl}/api/session/test-voice`;
-        const resPrimary = await fetch(endpointPrimary, {
+        const targetUrl = sessionId && sessionId !== "default_session"
+          ? `${backendUrl.replace(/\/+$/, "")}/api/session/${encodeURIComponent(sessionId)}/test-voice?token=${encodeURIComponent(adminToken || "")}`
+          : `${backendUrl.replace(/\/+$/, "")}/api/session/test-voice`;
+
+        const res = await fetch(targetUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${adminToken}`,
-            "X-Admin-Token": adminToken,
-          },
-          body: JSON.stringify(payload),
-        }).catch(() => null);
-
-        if (resPrimary && resPrimary.ok) {
-          return true;
-        }
-
-        // Fallback to backend route: /api/session/{sessionId}/test_voice?token={adminToken}
-        const endpointFallback = `${backendUrl}/api/session/${encodeURIComponent(sessionId)}/test_voice?token=${encodeURIComponent(adminToken)}`;
-        const resFallback = await fetch(endpointFallback, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Admin-Token": adminToken,
+            "X-Admin-Token": adminToken || "",
+            Authorization: adminToken ? `Bearer ${adminToken}` : "",
           },
           body: JSON.stringify(payload),
         });
 
-        return resFallback.ok;
+        return res.ok;
       } catch (err) {
         console.error("[useDashboardSocket] testVoice execution error:", err);
         return false;
