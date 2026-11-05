@@ -63,7 +63,7 @@ export default function RootLayout({
       className={`${roboto.variable} ${robotoMono.variable} ${kanit.variable} dark`}
       suppressHydrationWarning
     >
-      <body className="font-sans antialiased bg-white dark:bg-[#0F0F0F] text-[#0F0F0F] dark:text-white min-h-screen transition-colors duration-200">
+      <body className="font-sans antialiased bg-white dark:bg-broadcast-dark text-broadcast-dark dark:text-white min-h-screen transition-colors duration-200">
         <ThemeProvider>
           {children}
         </ThemeProvider>
