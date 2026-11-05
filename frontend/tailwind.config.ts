@@ -15,6 +15,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["var(--font-kanit)", "sans-serif"],
+      },
       colors: {
         "tiktok-cyan": "#00f2fe",
         "tiktok-red": "#fe2c55",

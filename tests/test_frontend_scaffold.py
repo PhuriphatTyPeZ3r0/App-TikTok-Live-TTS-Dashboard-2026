@@ -1,7 +1,7 @@
 """Tests for Next.js 15 Single-Page Application (SPA) scaffolding and visionOS Liquid Glass design system.
 
 This module validates that the frontend project structure, dependencies, TypeScript
-configuration, Tailwind CSS design tokens, global visionOS frosted glass styling,
+configuration, PostCSS configuration, Tailwind CSS design tokens, global visionOS frosted glass styling,
 root layout with typography and metadata, and Vercel Content Delivery Network (CDN)
 deployment configuration are strictly implemented.
 
@@ -18,6 +18,7 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 PACKAGE_JSON = FRONTEND_DIR / "package.json"
 TSCONFIG_JSON = FRONTEND_DIR / "tsconfig.json"
 TAILWIND_CONFIG = FRONTEND_DIR / "tailwind.config.ts"
+POSTCSS_CONFIG = FRONTEND_DIR / "postcss.config.mjs"
 GLOBALS_CSS = FRONTEND_DIR / "src" / "app" / "globals.css"
 LAYOUT_TSX = FRONTEND_DIR / "src" / "app" / "layout.tsx"
 VERCEL_JSON = REPO_ROOT / "vercel.json"
@@ -72,8 +73,17 @@ def test_frontend_tsconfig_json_paths_and_target():
     assert "./src/*" in paths["@/*"] or ["./src/*"] == paths["@/*"]
 
 
+def test_postcss_config_exists_and_valid():
+    """Verify frontend/postcss.config.mjs exists and references tailwindcss and autoprefixer."""
+    assert POSTCSS_CONFIG.exists(), f"Missing postcss.config.mjs at {POSTCSS_CONFIG}"
+    content = POSTCSS_CONFIG.read_text(encoding="utf-8")
+
+    assert "tailwindcss" in content
+    assert "autoprefixer" in content
+
+
 def test_tailwind_config_liquid_glass_tokens():
-    """Verify frontend/tailwind.config.ts configures TikTok palette and visionOS glass tokens."""
+    """Verify frontend/tailwind.config.ts configures TikTok palette, Kanit font, and visionOS glass tokens."""
     assert TAILWIND_CONFIG.exists(), f"Missing tailwind.config.ts at {TAILWIND_CONFIG}"
     content = TAILWIND_CONFIG.read_text(encoding="utf-8")
 
@@ -92,6 +102,9 @@ def test_tailwind_config_liquid_glass_tokens():
     # Extended backdrop blur tokens
     assert "backdropBlur" in content or "backdropFilter" in content or "64px" in content
     assert "3xl" in content or "64px" in content
+
+    # Font family linking
+    assert "--font-kanit" in content
 
 
 def test_globals_css_visionos_classes():
