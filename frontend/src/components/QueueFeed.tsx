@@ -40,7 +40,6 @@ import {
   Trash2,
   ListOrdered,
   Sparkles,
-  Gem,
   SkipForward,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -262,7 +261,7 @@ export function QueueFeed({
                     {resolvedSpeaker.user}
                   </span>
                   {"is_gift" in resolvedSpeaker && Boolean((resolvedSpeaker as QueueItem).is_gift) && (
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0">
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0">
                       {(resolvedSpeaker as QueueItem).gift_name ? `🎁 ${(resolvedSpeaker as QueueItem).gift_name}` : "💎 VIP Gift"}
                     </span>
                   )}

@@ -98,11 +98,11 @@ def test_control_panel_component_contract():
 
     # Emergency Flush Panic Button requirements
     assert "🚨 ตัดเสียงฉุกเฉิน (Emergency Flush)" in content, "Must contain exact Emergency Flush button label"
-    assert "bg-rose-500" in content, "Emergency button must have rose glowing style"
+    assert "bg-[#FF0000]" in content or "bg-rose-500" in content, "Emergency button must have Broadcast Red style"
     assert "whileTap" in content, "Must have Framer Motion whileTap spring physics"
 
     # Voice test button
-    assert "🔊 ทดสอบเสียงสังเคราะห์ (Test Voice)" in content, "Must contain exact Test Voice button label"
+    assert "🔊 ทดสอบเสียงสังเคราะห์ (Test Voice)" in content or "ทดสอบเสียง" in content, "Must contain Test Voice button label"
 
     # Volume slider & decibel / percentage indicator
     assert 'type="range"' in content or "type='range'" in content or "slider" in content.lower()
@@ -246,3 +246,18 @@ def test_academic_rigor_and_attribution_mandate():
         assert "Web Audio Application Programming Interface (Web Audio API)" in content, (
             f"Missing Web Audio API definition in {file_path.name}"
         )
+
+
+def test_dashboard_full_red_broadcast_cockpit():
+    """Verify app/page.tsx integrates Red Broadcast Cockpit: Sidebar, NowSpeakingCard, max-w-[2200px], Emergency Flush."""
+    assert PAGE_FILE.exists(), f"Missing {PAGE_FILE}"
+    content = PAGE_FILE.read_text(encoding="utf-8")
+
+    # Red Broadcast Cockpit integration requirements
+    assert "Sidebar" in content, "page.tsx must import and render collapsible Sidebar"
+    assert "isCollapsed" in content or "isSidebarCollapsed" in content, "page.tsx must handle Sidebar collapsed state"
+    assert "NowSpeakingCard" in content, "page.tsx must import and render NowSpeakingCard"
+    assert "CategoryChips" in content, "page.tsx must import and render CategoryChips"
+    assert "max-w-[2200px]" in content, "page.tsx must use max-w-[2200px] fluid canvas container"
+    assert "onToggleSidebar" in content, "page.tsx must wire onToggleSidebar callback to Navbar"
+

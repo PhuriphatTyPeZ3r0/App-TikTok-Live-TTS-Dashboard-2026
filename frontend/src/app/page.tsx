@@ -1,41 +1,48 @@
 "use client";
 
 /**
- * Apple visionOS Frosted Liquid Glass Streamer Cockpit Studio Dashboard for Next.js 15.
+ * Red Broadcast Streamer Cockpit Studio Dashboard for Next.js 15.
  *
  * Professional Single-Page Application (SPA) dashboard communicating with FastAPI
- * Asynchronous Server Gateway Interface (ASGI) server, coordinating with
+ * Asynchronous Server Gateway Interface (ASGI) backend server, coordinating with
  * the Web Audio Application Programming Interface (Web Audio API) and First-In, First-Out (FIFO) queue.
  *
- * Professional 2-Column Streamer Cockpit layout:
- * - Left Column (7 cols): Ingestion Feed & First-In, First-Out (FIFO) Speech Queue
- * - Right Column (5 cols): Audio Visualizer, 1-Click OBS Studio Integration Wizard,
- *   Tactile Master Controls & Emergency Panic Flush, Instant Voice Test & Presets,
- *   and Google Colaboratory (Tesla T4 GPU) Telemetry.
+ * Streamer Cockpit Layout:
+ * - Collapsible Navigation Drawer (240px expanded ↔ 72px icon rail)
+ * - Sticky Top Navigation Bar (56px) with real-time multi-system telemetry
+ * - Top Category Chips filter bar
+ * - Fluid Canvas Container adapting smoothly up to 2200px (max-w-[2200px])
+ * - 2-Column Cockpit Grid:
+ *     - Left Column (7 cols): NowSpeakingCard 16:9 Video Spotlight atop QueueFeed
+ *     - Right Column (5 cols): ControlPanel master controls, OBSIntegrationCard wizard,
+ *       VoiceTestCard presets, and ColabStatusCard GPU telemetry
  *
- * Features automatic backend active session discovery and streamlined onboarding workflow.
- *
- * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Voice Actor Attribution: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Master Thai Voice Model for Text-to-Speech (TTS) live streaming systems.
  */
 
 import React, { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
-import { AudioVisualizer } from "../components/AudioVisualizer";
-import { ControlPanel } from "../components/ControlPanel";
+import { Sidebar } from "../components/Sidebar";
+import { CategoryChips } from "../components/CategoryChips";
+import { NowSpeakingCard } from "../components/NowSpeakingCard";
 import { QueueFeed } from "../components/QueueFeed";
+import { ControlPanel } from "../components/ControlPanel";
 import { OBSIntegrationCard } from "../components/OBSIntegrationCard";
 import { VoiceTestCard } from "../components/VoiceTestCard";
 import { ColabStatusCard } from "../components/ColabStatusCard";
+import { AudioVisualizer } from "../components/AudioVisualizer";
 import { useDashboardSocket } from "../hooks/useDashboardSocket";
 import { motion, AnimatePresence } from "framer-motion";
 import { Radio, Sparkles, UserPlus, Loader2, X, Play } from "lucide-react";
 
-function BentoDashboardContent() {
+function RedBroadcastCockpitContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const defaultBackend = process.env.NEXT_PUBLIC_BACKEND_URL || "https://tiktok-live-tts-bot.onrender.com";
+  const defaultBackend =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "https://tiktok-live-tts-bot.onrender.com";
   const [backendUrl, setBackendUrl] = useState<string>(
     searchParams.get("backendUrl") || searchParams.get("backend_url") || defaultBackend
   );
@@ -52,6 +59,11 @@ function BentoDashboardContent() {
   const [username, setUsername] = useState<string>(
     searchParams.get("username") || ""
   );
+
+  // Navigation & Category Filter State
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [activeNavTab, setActiveNavTab] = useState<string>("cockpit");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   // Modal / Onboarding input state
   const [showRoomModal, setShowRoomModal] = useState<boolean>(false);
@@ -195,169 +207,219 @@ function BentoDashboardContent() {
   };
 
   const isOBSConnected = (stats.connected_clients || 0) > 0;
+  const isColabConnected = Boolean(
+    colabSettings?.colab_tunnel_url && stats.active_engine?.toLowerCase().includes("colab")
+  );
 
   return (
-    <main className="min-h-screen ambient-glow p-4 sm:p-6 lg:p-8 flex flex-col justify-between max-w-7xl mx-auto">
-      {/* Top: Header & Live System Status Telemetry */}
+    <div className="min-h-screen flex flex-col bg-[#F9F9F9] dark:bg-[#0F0F0F] text-[#0F0F0F] dark:text-white transition-colors">
+      {/* Top: Sticky Navigation Bar */}
       <Navbar
         username={username || "@tiktok_creator"}
         isConnected={isConnected}
         isReconnecting={isReconnecting}
         backendUrl={backendUrl}
         sessionId={sessionId}
+        overlayToken={overlayToken}
         obsConnected={isOBSConnected}
+        colabConnected={isColabConnected}
         activeEngine={stats.active_engine}
         onOpenRoomModal={() => setShowRoomModal(true)}
+        onToggleSidebar={() => setIsSidebarCollapsed((prev) => !prev)}
       />
 
-      {/* Floating Connection Notice Banner */}
-      <AnimatePresence>
-        {connectionNotice && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="mb-4 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 text-xs font-medium text-center backdrop-blur-md shadow-lg"
-          >
-            {connectionNotice}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Main Container with Collapsible Sidebar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Collapsible Sidebar Navigation */}
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          activeTab={activeNavTab}
+          onSelectTab={setActiveNavTab}
+        />
 
-      {/* Quick Setup Banner if no session is configured */}
-      {!sessionId && (
-        <div className="mb-6 p-5 rounded-2xl liquid-glass specular-border border-cyan-400/30 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-tr from-[#fe2c55]/30 to-[#00f2fe]/30 border border-white/20 text-white">
-              <Radio className="w-5 h-5 text-cyan-300" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-white">เริ่มต้นการใช้งาน TikTok Live TTS</h3>
-              <p className="text-xs text-white/60">
-                ใส่ชื่อช่อง TikTok ของคุณเพื่อเชื่อมต่อห้อง Live สดและรับข้อความทันที
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowRoomModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white text-xs font-semibold shadow-lg active:scale-95 transition-all"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>เชื่อมต่อห้อง Live ตอนนี้</span>
-          </button>
-        </div>
-      )}
-
-      {/* Main Streamer Cockpit: 2-Column Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-start">
-        {/* Left Column (7 cols): Ingestion Feed & Priority Speech Queue */}
-        <div className="lg:col-span-7 h-full flex flex-col gap-6">
-          <QueueFeed
-            queue={queue}
-            speakingItem={speakingItem}
-            onSkipItem={skipItem}
-            onClearQueue={sendControlFlush}
-          />
-        </div>
-
-        {/* Right Column (5 cols): Controls, Waveform, OBS Integration & Voice Studio */}
-        <div className="lg:col-span-5 flex flex-col gap-5">
-          {/* Audio Visualizer Waveform Card */}
-          <div className="liquid-glass specular-border rounded-2xl p-4 shadow-xl backdrop-blur-2xl">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-white/80 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>คลื่นเสียงสด (Live Audio Spectrum)</span>
-              </span>
-              <span className="text-[10px] font-mono text-cyan-300">
-                {speakingItem ? "กำลังสังเคราะห์เสียง..." : "สแตนด์บาย"}
-              </span>
-            </div>
-            <AudioVisualizer
-              isSpeaking={Boolean(speakingItem)}
-              accentColor="#00f2fe"
-              height={70}
-              barCount={28}
-              className="w-full"
+        {/* Fluid Canvas Main Content Area (Max Width: 2200px) */}
+        <main className="flex-1 min-w-0 overflow-y-auto">
+          <div className="max-w-[2200px] w-full mx-auto p-4 md:p-6 flex flex-col gap-5">
+            {/* Top Filter Category Chips */}
+            <CategoryChips
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
             />
+
+            {/* Floating Connection Notice Banner */}
+            <AnimatePresence>
+              {connectionNotice && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="px-4 py-2.5 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-medium text-center shadow-md"
+                >
+                  {connectionNotice}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Quick Setup Banner if no session is configured */}
+            {!sessionId && (
+              <div className="p-4 md:p-5 rounded-xl bg-white dark:bg-[#0F0F0F] border border-broadcast-border-light dark:border-broadcast-border-dark flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
+                    <Radio className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-neutral-900 dark:text-white">
+                      เริ่มต้นการใช้งาน TikTok Live TTS
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      ใส่ชื่อช่อง TikTok ของคุณเพื่อเชื่อมต่อห้อง Live สดและรับข้อความทันที
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowRoomModal(true)}
+                  className="h-9 px-5 rounded-full bg-[#0F0F0F] dark:bg-white text-white dark:text-[#0F0F0F] text-xs font-semibold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-sm"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>เชื่อมต่อห้อง Live ตอนนี้</span>
+                </button>
+              </div>
+            )}
+
+            {/* 2-Column Cockpit Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+              {/* Left Column (7 cols): Video Spotlight Player atop Priority Speech Queue */}
+              <div className="lg:col-span-7 flex flex-col gap-5">
+                {/* 16:9 Now Speaking Spotlight Video Card */}
+                <NowSpeakingCard
+                  currentSpeaker={speakingItem}
+                  isSpeaking={Boolean(speakingItem)}
+                  onSkip={() => speakingItem && skipItem(speakingItem.id)}
+                />
+
+                {/* Queue Feed Playlist */}
+                <QueueFeed
+                  queue={queue}
+                  speakingItem={speakingItem}
+                  onSkipItem={skipItem}
+                  onClearQueue={sendControlFlush}
+                  activeFilter={selectedCategory}
+                  onSelectFilter={setSelectedCategory}
+                />
+              </div>
+
+              {/* Right Column (5 cols): Controls, OBS Wizard, Voice Test, GPU Telemetry */}
+              <div className="lg:col-span-5 flex flex-col gap-5">
+                {/* Streamer Master Cockpit Controls */}
+                <ControlPanel
+                  volume={volume}
+                  onVolumeChange={setVolume}
+                  enableComments={enableComments}
+                  onToggleComments={setEnableComments}
+                  enableGifts={enableGifts}
+                  onToggleGifts={setEnableGifts}
+                  onEmergencyFlush={sendControlFlush}
+                  onTestVoice={() =>
+                    handleTestVoice(
+                      "ยินดีต้อนรับเข้าสู่ไลฟ์สดครับ ระบบเสียงสังเคราะห์ทำงานได้อย่างถูกต้อง"
+                    )
+                  }
+                  onSkipCurrent={() => speakingItem && skipItem(speakingItem.id)}
+                  onClearQueue={sendControlFlush}
+                  isPaused={isPaused}
+                  onTogglePause={() => setIsPaused(!isPaused)}
+                  isTestingVoice={isTestingVoice}
+                />
+
+                {/* 1-Click OBS Studio Setup Wizard */}
+                <OBSIntegrationCard
+                  backendUrl={backendUrl}
+                  sessionId={sessionId}
+                  overlayToken={overlayToken}
+                  connectedClients={stats.connected_clients}
+                  obsConnected={isOBSConnected}
+                />
+
+                {/* Instant Voice Test & Presets */}
+                <VoiceTestCard
+                  onTestVoice={handleTestVoice}
+                  isTestingVoice={isTestingVoice}
+                  isSpeaking={Boolean(speakingItem)}
+                />
+
+                {/* Live Audio Spectrum Telemetry Card */}
+                <div className="bg-white dark:bg-[#0F0F0F] rounded-xl border border-broadcast-border-light dark:border-broadcast-border-dark p-4 transition-colors">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
+                      <span>คลื่นเสียงสด (Live Audio Spectrum)</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-neutral-500 dark:text-neutral-400">
+                      {speakingItem ? "กำลังสังเคราะห์เสียง..." : "สแตนด์บาย"}
+                    </span>
+                  </div>
+                  <AudioVisualizer
+                    isSpeaking={Boolean(speakingItem)}
+                    accentColor="#FF0000"
+                    height={40}
+                    barCount={28}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* AI GPU Server & Colab Tunnel Telemetry Accordion */}
+                <ColabStatusCard
+                  colabSettings={colabSettings}
+                  activeEngine={stats.active_engine}
+                  onUpdateSettings={async (settings) => {
+                    const ok = await updateColabSettings(settings);
+                    if (!ok) {
+                      throw new Error("Failed to update Colab tunnel configuration");
+                    }
+                  }}
+                />
+              </div>
+            </div>
           </div>
-
-          {/* 1-Click OBS Studio Setup Card */}
-          <OBSIntegrationCard
-            backendUrl={backendUrl}
-            sessionId={sessionId}
-            overlayToken={overlayToken}
-            connectedClients={stats.connected_clients}
-          />
-
-          {/* Master Streamer Controls & Emergency Flush */}
-          <ControlPanel
-            volume={volume}
-            onVolumeChange={setVolume}
-            enableComments={enableComments}
-            onToggleComments={setEnableComments}
-            enableGifts={enableGifts}
-            onToggleGifts={setEnableGifts}
-            onEmergencyFlush={sendControlFlush}
-            onTestVoice={() => handleTestVoice("สวัสดีครับ ระบบเสียงสังเคราะห์ทำงานได้อย่างถูกต้อง")}
-            onSkipCurrent={() => speakingItem && skipItem(speakingItem.id)}
-            isPaused={isPaused}
-            onTogglePause={() => setIsPaused(!isPaused)}
-            isTestingVoice={isTestingVoice}
-          />
-
-          {/* Instant Voice Test & Quick Presets */}
-          <VoiceTestCard
-            onTestVoice={handleTestVoice}
-            isTestingVoice={isTestingVoice}
-          />
-
-          {/* AI GPU Server & Colab Tunnel Telemetry Accordion */}
-          <ColabStatusCard
-            colabSettings={colabSettings}
-            activeEngine={stats.active_engine}
-            onUpdateSettings={async (settings) => {
-              const ok = await updateColabSettings(settings);
-              if (!ok) {
-                throw new Error("Failed to update Colab tunnel configuration");
-              }
-            }}
-          />
-        </div>
+        </main>
       </div>
 
       {/* Room Connection Modal */}
       <AnimatePresence>
         {showRoomModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md liquid-glass specular-border rounded-2xl p-6 shadow-2xl relative"
+              className="w-full max-w-md bg-white dark:bg-[#0F0F0F] rounded-2xl border border-broadcast-border-light dark:border-broadcast-border-dark p-6 shadow-2xl relative"
             >
               <button
                 type="button"
                 onClick={() => setShowRoomModal(false)}
-                className="absolute top-4 right-4 p-1 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+                className="absolute top-4 right-4 p-1 rounded-full text-neutral-400 hover:text-neutral-700 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
 
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-400/30 text-cyan-300">
+                <div className="p-2.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
                   <Radio className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-white">เชื่อมต่อ TikTok Live</h3>
-                  <p className="text-xs text-white/50">ระบุชื่อผู้ใช้ TikTok สำหรับดึงข้อความไลฟ์</p>
+                  <h3 className="text-base font-bold text-neutral-900 dark:text-white">
+                    เชื่อมต่อ TikTok Live
+                  </h3>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    ระบุชื่อผู้ใช้ TikTok สำหรับดึงข้อความไลฟ์
+                  </p>
                 </div>
               </div>
 
               <form onSubmit={handleStartSession} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-white/80 mb-1.5">
+                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
                     ชื่อช่อง TikTok (TikTok Username)
                   </label>
                   <input
@@ -366,7 +428,7 @@ function BentoDashboardContent() {
                     value={inputUsername}
                     onChange={(e) => setInputUsername(e.target.value)}
                     placeholder="เช่น @streamer_channel หรือ streamer_channel"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-black/50 border border-white/20 focus:border-cyan-400 text-sm text-white placeholder-white/30 outline-none transition-colors"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-broadcast-border-light dark:border-broadcast-border-dark focus:border-neutral-900 dark:focus:border-white text-sm text-neutral-900 dark:text-white placeholder-neutral-400 outline-none transition-colors"
                   />
                 </div>
 
@@ -374,14 +436,14 @@ function BentoDashboardContent() {
                   <button
                     type="button"
                     onClick={() => setShowRoomModal(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-white/70 hover:text-white transition-colors"
+                    className="h-9 px-4 rounded-full text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
                   >
                     ยกเลิก
                   </button>
                   <button
                     type="submit"
                     disabled={isStartingSession || !inputUsername.trim()}
-                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:brightness-110 text-white text-xs font-semibold shadow-md active:scale-95 transition-all disabled:opacity-50"
+                    className="h-9 px-5 rounded-full bg-[#0F0F0F] dark:bg-white text-white dark:text-[#0F0F0F] text-xs font-semibold flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all shadow-sm disabled:opacity-50"
                   >
                     {isStartingSession ? (
                       <>
@@ -401,7 +463,7 @@ function BentoDashboardContent() {
           </div>
         )}
       </AnimatePresence>
-    </main>
+    </div>
   );
 }
 
@@ -409,14 +471,18 @@ export default function BentoDashboardPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen ambient-glow flex flex-col items-center justify-center p-6 text-white font-sans">
-          <div className="w-12 h-12 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin mb-4" />
-          <h2 className="text-base font-medium tracking-wide">กำลังโหลด TikTok Live TTS Studio...</h2>
-          <p className="text-xs text-white/50 mt-1">เสียงพากย์: พิพัฒน์ บุญสิทธิเลิศ</p>
+        <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#F9F9F9] dark:bg-[#0F0F0F] text-neutral-900 dark:text-white font-sans">
+          <div className="w-10 h-10 rounded-full border-2 border-neutral-300 dark:border-neutral-700 border-t-[#FF0000] animate-spin mb-4" />
+          <h2 className="text-base font-medium tracking-wide">
+            กำลังโหลด TikTok Live TTS Studio...
+          </h2>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            เสียงพากย์: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+          </p>
         </div>
       }
     >
-      <BentoDashboardContent />
+      <RedBroadcastCockpitContent />
     </Suspense>
   );
 }
