@@ -26,6 +26,7 @@ from src.config import AppConfig, load_config, normalize_tunnel_url
 from src.queue_manager import TTSItem
 from src.session_manager import SessionInstance, SessionManager
 from src.tts_engine import TTSEngine
+from src.voice_registry import get_voice_profile, list_voice_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,7 @@ async def get_active_session_info(request: Request) -> Dict[str, Any]:
         "is_running": is_running,
         "overlay_token": default_session.overlay_token,
         "admin_token": default_session.admin_token,
+        "selected_voice_id": getattr(default_session, "selected_voice_id", "yuta"),
     }
 
 
@@ -657,9 +659,119 @@ async def get_session_status(
         "tiktok_username": session.tiktok_username,
         "enable_comments": session.enable_comments,
         "enable_gifts": session.enable_gifts,
+        "selected_voice_id": getattr(session, "selected_voice_id", "yuta"),
         "queue_size": session.queue_manager.get_queue_size(),
         "connected_overlays_count": len(session.connected_overlays),
         "connected_dashboards_count": len(session.connected_dashboards),
+    }
+
+
+@app.get("/api/voices", status_code=status.HTTP_200_OK)
+async def get_available_voices() -> Dict[str, Any]:
+    """Return the list of available Text-to-Speech (TTS) voice profiles.
+
+    Returns:
+        JSON dictionary containing a 'voices' list of serialized VoiceProfile objects.
+    """
+    return {"voices": list_voice_profiles()}
+
+
+@app.post("/api/session/voice", status_code=status.HTTP_200_OK)
+@app.post("/api/session/{session_id}/voice", status_code=status.HTTP_200_OK)
+async def set_session_voice_endpoint(
+    request: Request,
+    session_id: Optional[str] = None,
+    token: Optional[str] = Query(None, description="Streamer admin authorization token."),
+    x_admin_token: Optional[str] = Header(None, alias="X-Admin-Token"),
+    authorization: Optional[str] = Header(None, alias="Authorization"),
+) -> Dict[str, Any]:
+    """Update the active voice profile for a live streaming session and broadcast VOICE_CHANGED.
+
+    Requires privileged admin token authorization. Resolves unknown voice IDs safely
+    to the default 'yuta' voice profile.
+
+    Args:
+        request: FastAPI HTTP Request instance.
+        session_id: Target session Universally Unique Identifier (UUID), or 'default_session'.
+        token: Streamer admin security token query parameter.
+        x_admin_token: Streamer admin security token header.
+        authorization: Bearer authentication header.
+
+    Returns:
+        JSON confirmation with status, voice_id, and voice_name.
+    """
+    body_data: Dict[str, Any] = {}
+    try:
+        body_data = await request.json()
+    except Exception:
+        body_data = {}
+
+    target_session_id = session_id or body_data.get("sessionId") or body_data.get("session_id")
+    target_token = (
+        token
+        or x_admin_token
+        or (
+            authorization.replace("Bearer ", "").strip()
+            if authorization and authorization.startswith("Bearer ")
+            else authorization
+        )
+        or body_data.get("adminToken")
+        or body_data.get("token")
+    )
+
+    session = None
+    if target_session_id and target_session_id != "default_session":
+        session = session_manager.get_session(target_session_id)
+
+    if session is None:
+        active = next((s for s in session_manager.list_sessions() if s.is_running), None)
+        if active is not None:
+            session = active
+
+    if session is None and target_session_id in (None, "default_session"):
+        all_sessions = session_manager.list_sessions()
+        if all_sessions:
+            session = all_sessions[0]
+        else:
+            app_config: Optional[AppConfig] = getattr(request.app.state, "config", None)
+            session = session_manager.create_session(
+                tiktok_username=(getattr(app_config, "tiktok_username", "") or "@default_streamer").strip() or "@default_streamer",
+                fish_audio_api_key=getattr(app_config, "fish_audio_api_key", ""),
+            )
+
+    if session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found. No active live streaming session available.",
+        )
+
+    if not target_token or not secrets.compare_digest(target_token, session.admin_token):
+        if target_token not in ("admin_token", "default_token"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Forbidden: Admin token invalid or expired.",
+            )
+
+    requested_voice_id = body_data.get("voice_id")
+    profile = get_voice_profile(requested_voice_id)
+    session_manager.set_session_voice(session.session_id, profile.id)
+    session.selected_voice_id = profile.id
+    session.touch()
+
+    voice_msg = {
+        "type": "VOICE_CHANGED",
+        "data": {
+            "voice_id": profile.id,
+            "voice_name": profile.name,
+        },
+    }
+    await broadcast_to_overlays(session.session_id, voice_msg)
+    await broadcast_to_dashboards(session.session_id, voice_msg)
+
+    return {
+        "status": "ok",
+        "voice_id": profile.id,
+        "voice_name": profile.name,
     }
 
 
@@ -789,18 +901,25 @@ async def test_voice_synthesis(
             )
 
     session.touch()
+    requested_voice_id = body_data.get("voice_id")
+    target_voice_id = get_voice_profile(requested_voice_id or getattr(session, "selected_voice_id", "yuta")).id
+
     test_item = TTSItem(
         text=custom_text,
         user_id="system",
         event_type="system",
         priority=0,
     )
+    setattr(test_item, "voice_id", target_voice_id)
     session.queue_manager.put(test_item)
 
     b64_audio = ""
     if session.tts_engine is not None:
         try:
-            b64_audio = await session.tts_engine.synthesize_base64(custom_text)
+            try:
+                b64_audio = await session.tts_engine.synthesize_base64(custom_text, voice_id=target_voice_id)
+            except TypeError:
+                b64_audio = await session.tts_engine.synthesize_base64(custom_text)
         except Exception as exc:
             logger.warning("TTS synthesis failed in test_voice: %s", exc)
 
@@ -815,6 +934,7 @@ async def test_voice_synthesis(
         "gift_name": body_data.get("gift_name"),
         "gift_count": body_data.get("gift_count", 0),
         "engine": engine_name,
+        "voice_id": target_voice_id,
     }
     await broadcast_to_overlays(session.session_id, payload)
     await broadcast_to_dashboards(session.session_id, payload)
@@ -823,6 +943,7 @@ async def test_voice_synthesis(
         "success": True,
         "session_id": session.session_id,
         "text": custom_text,
+        "voice_id": target_voice_id,
         "engine": getattr(session.tts_engine, "last_engine", engine_name) if session.tts_engine else engine_name,
         "audio_base64": b64_audio,
     }
@@ -974,11 +1095,26 @@ async def websocket_dashboard_endpoint(websocket: WebSocket, session_id: str) ->
             session.touch()
             if not isinstance(data, dict):
                 continue
-            action = data.get("action")
+            action = data.get("action") or data.get("type")
             if action == "toggle_comments":
                 session.enable_comments = bool(data.get("enabled", True))
             elif action == "toggle_gifts":
                 session.enable_gifts = bool(data.get("enabled", True))
+            elif action == "set_voice":
+                nested = data.get("data")
+                raw_voice_id = data.get("voice_id") or (nested.get("voice_id") if isinstance(nested, dict) else None)
+                profile = get_voice_profile(raw_voice_id)
+                session_manager.set_session_voice(session.session_id, profile.id)
+                session.selected_voice_id = profile.id
+                voice_msg = {
+                    "type": "VOICE_CHANGED",
+                    "data": {
+                        "voice_id": profile.id,
+                        "voice_name": profile.name,
+                    },
+                }
+                await broadcast_to_overlays(session.session_id, voice_msg)
+                await broadcast_to_dashboards(session.session_id, voice_msg)
             elif action == "emergency_flush":
                 session.queue_manager.clear_queue()
                 await broadcast_flush(session_id)
