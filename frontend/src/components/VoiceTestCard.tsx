@@ -33,14 +33,17 @@ export interface VoiceTestCardProps {
 export const PRESET_MESSAGES = [
   {
     label: "ยินดีต้อนรับ",
+    icon: "waving_hand",
     text: "ยินดีต้อนรับเข้าสู่ไลฟ์สดครับ ขอให้เพลิดเพลินกับบรรยากาศไลฟ์นะครับ",
   },
   {
-    label: "ขอบคุณของขวัญ 🎁",
+    label: "ขอบคุณของขวัญ",
+    icon: "redeem",
     text: "ขอบคุณสำหรับของขวัญมากครับ ขอให้มีแต่ความสุข ร่ำรวยเงินทองครับ",
   },
   {
-    label: "เคาะจอเคาะใจ ❤️",
+    label: "เคาะจอเคาะใจ",
+    icon: "favorite",
     text: "ช่วยกดติดตามและเคาะหน้าจอเป็นกำลังใจให้ด้วยนะครับ ขอบคุณมากครับ",
   },
 ];
@@ -97,9 +100,12 @@ export function VoiceTestCard({
               handleSendTest(preset.text);
             }}
             disabled={isBusy}
-            className="px-3 py-1 rounded-full text-[11px] font-medium bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 border border-broadcast-border-light dark:border-broadcast-border-dark transition-colors active:scale-95 disabled:opacity-50"
+            className="px-3 py-1 rounded-full text-[11px] font-medium bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 border border-broadcast-border-light dark:border-broadcast-border-dark transition-colors active:scale-95 disabled:opacity-50 inline-flex items-center gap-1"
           >
-            {preset.label}
+            <span className="material-symbols-rounded text-xs leading-none select-none">
+              {preset.icon}
+            </span>
+            <span>{preset.label}</span>
           </button>
         ))}
       </div>

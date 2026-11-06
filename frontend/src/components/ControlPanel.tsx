@@ -15,7 +15,7 @@
  * - Subscribe-styled primary buttons (`bg-[#0F0F0F] dark:bg-white text-white dark:text-[#0F0F0F] rounded-full`).
  * - Master volume slider (0-150% with decibel dB display).
  * - Prominent Broadcast Red emergency flush button: `bg-[#FF0000] hover:bg-[#CC0000] text-white rounded-full`
- *   with exact string "🚨 ตัดเสียงฉุกเฉิน (Emergency Flush)".
+ *   with "ตัดเสียงฉุกเฉิน (Emergency Flush)".
  * - Full backward compatibility with existing tests and WebSocket contracts.
  */
 
@@ -286,8 +286,10 @@ export function ControlPanel({
           disabled={isTestingVoice}
           className="w-full h-9 px-4 rounded-full bg-[#0F0F0F] dark:bg-white text-white dark:text-[#0F0F0F] text-xs font-semibold flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
         >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>🔊 ทดสอบเสียงสังเคราะห์ (Test Voice)</span>
+          <span className="material-symbols-rounded text-base leading-none select-none">
+            volume_up
+          </span>
+          <span>ทดสอบเสียงสังเคราะห์ (Test Voice)</span>
         </motion.button>
 
         {/* Prominent Broadcast Red Emergency Flush Button (#FF0000) */}
@@ -298,11 +300,13 @@ export function ControlPanel({
           disabled={isFlushing}
           className="w-full h-10 md:h-11 px-5 rounded-full bg-[#FF0000] hover:bg-[#CC0000] text-white text-xs md:text-sm font-bold tracking-wide flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50"
         >
-          <AlertOctagon className="w-4 h-4 text-white animate-pulse" />
+          <span className="material-symbols-rounded text-base text-white animate-pulse leading-none select-none">
+            emergency_home
+          </span>
           <span>
             {isFlushing
               ? "กำลังล้างคิวและหยุดเสียง..."
-              : "🚨 ตัดเสียงฉุกเฉิน (Emergency Flush)"}
+              : "ตัดเสียงฉุกเฉิน (Emergency Flush)"}
           </span>
         </motion.button>
       </div>

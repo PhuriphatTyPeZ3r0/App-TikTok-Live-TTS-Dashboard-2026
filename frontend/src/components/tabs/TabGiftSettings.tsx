@@ -41,14 +41,17 @@ export function TabGiftSettings({ settings, onUpdate }: TabGiftSettingsProps) {
       <div className="flex items-center justify-between gap-4 p-3.5 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-400">
         <div>
           <div className="text-sm font-bold text-amber-400 flex items-center gap-1.5">
-            <span>⚡ Priority Queue (คิวบุริมภาพ)</span>
+            <span className="material-symbols-rounded text-base leading-none select-none">
+              bolt
+            </span>
+            <span>Priority Queue (คิวบุริมภาพ)</span>
           </div>
           <div className="text-xs text-amber-200/80 mt-0.5">
             ให้เสียงของขวัญ Gift TTS แทรกคิวแซงหน้า Chat ทันที
           </div>
         </div>
         <ToggleSwitch
-          ariaLabel="⚡ Priority Queue (คิวบุริมภาพ)"
+          ariaLabel="Priority Queue (คิวบุริมภาพ)"
           checked={settings.giftPriorityQueue}
           onChange={(checked) => onUpdate({ giftPriorityQueue: checked })}
         />

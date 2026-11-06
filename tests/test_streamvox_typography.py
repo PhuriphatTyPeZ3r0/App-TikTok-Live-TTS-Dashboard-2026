@@ -10,10 +10,12 @@ Backend Architecture: Asynchronous Server Gateway Interface (ASGI)
 """
 
 from pathlib import Path
+import re
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 LAYOUT_TSX = REPO_ROOT / "frontend" / "src" / "app" / "layout.tsx"
 OVERLAY_HTML = REPO_ROOT / "templates" / "overlay.html"
+EMOJI_ICON_PATTERN = re.compile(r"[\U0001F300-\U0001FAFF\u2600-\u27BF\u2300-\u23FF\u2B50\u2705\u274C\u26A0\uFE0F]")
 
 
 def test_layout_includes_prompt_font_and_material_symbols() -> None:
@@ -41,3 +43,18 @@ def test_overlay_includes_prompt_font_and_material_symbols() -> None:
 
     assert "Prompt" in content
     assert "Material+Symbols+Rounded" in content
+    assert "material-symbols-rounded" in content
+
+
+def test_zero_emoji_icons_in_ui_components_and_templates() -> None:
+    """Verify all emojis used as icons in frontend/src and templates are replaced with Google Material Symbols."""
+    for folder in [REPO_ROOT / "frontend" / "src", REPO_ROOT / "templates"]:
+        for file_path in folder.rglob("*"):
+            if file_path.suffix in {".tsx", ".ts", ".html"}:
+                text = file_path.read_text(encoding="utf-8")
+                match = EMOJI_ICON_PATTERN.search(text)
+                assert match is None, (
+                    f"Found emoji character {match.group(0)!r} in {file_path.relative_to(REPO_ROOT)}; "
+                    "must use Google Material Symbols (material-symbols-rounded) instead."
+                )
+

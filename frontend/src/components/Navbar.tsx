@@ -9,7 +9,7 @@
  * - Subtitle: "TikTok Live Text-to-Speech (TTS) Studio • PyThaiNLP & Multi-Voice Powered"
  * - Status badges:
  *     - LIVE badge with pulsing dot: `LIVE: @{username || 'phuriphat_live'}`
- *     - Active Voice profile badge: `🎙️ {activeEngine}`
+ *     - Active Voice profile badge: `record_voice_over {activeEngine}`
  * - Quick Voice Test button with Google Material Symbols (`volume_up`) and loading indicator
  * - TTS Master toggle switch (masterTtsEnabled / onToggleMaster)
  * - Optional theme toggler and account/room switcher

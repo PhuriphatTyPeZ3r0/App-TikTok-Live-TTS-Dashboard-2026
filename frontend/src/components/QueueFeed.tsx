@@ -51,7 +51,10 @@ export function QueueFeed({
       <div className="flex items-center justify-between pb-3.5 border-b border-slate-800/80 gap-3">
         <div className="flex items-center gap-2.5">
           <h2 className="text-sm font-bold text-white flex items-center gap-2 tracking-wide">
-            <span>📋 คิวรออ่านเสียง</span>
+            <span className="material-symbols-rounded text-base text-[#25f4ee] leading-none select-none">
+              queue_music
+            </span>
+            <span>คิวรออ่านเสียง</span>
             <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-slate-700/60 shadow-sm">
               {queue.length} รายการ
             </span>
@@ -62,7 +65,10 @@ export function QueueFeed({
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-[#00e676]/10 text-[#00e676] border border-[#00e676]/30 shadow-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-[#00e676] animate-pulse" />
-            <span>⚡ Auto-Play ON</span>
+            <span className="material-symbols-rounded text-xs leading-none select-none">
+              bolt
+            </span>
+            <span>Auto-Play ON</span>
           </span>
         </div>
       </div>
@@ -101,7 +107,7 @@ export function QueueFeed({
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  {/* User Icon: 🎁 for gift, 💬 for chat */}
+                  {/* User Icon: redeem for gift, chat for chat */}
                   <div
                     className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 border ${
                       isGift
@@ -109,7 +115,9 @@ export function QueueFeed({
                         : "bg-slate-800 border-slate-700 text-slate-300"
                     }`}
                   >
-                    {isGift ? "🎁" : "💬"}
+                    <span className="material-symbols-rounded text-base leading-none select-none">
+                      {isGift ? "redeem" : "chat"}
+                    </span>
                   </div>
 
                   {/* Username, Gift Tag & Truncated Text */}
@@ -121,10 +129,15 @@ export function QueueFeed({
 
                       {/* Gift Tag */}
                       {isGift && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30 shrink-0">
-                          {giftName ? `🎁 ${giftName}` : "⚡ VIP Gift"}
-                          {giftAmount && giftAmount > 1 ? ` x${giftAmount}` : ""}
-                          {typeof coins === "number" ? ` (${coins} เหรียญ)` : ""}
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-400/15 text-amber-300 border border-amber-400/30 shrink-0">
+                          <span className="material-symbols-rounded text-xs leading-none select-none">
+                            {giftName ? "redeem" : "bolt"}
+                          </span>
+                          <span>
+                            {giftName || "VIP Gift"}
+                            {giftAmount && giftAmount > 1 ? ` x${giftAmount}` : ""}
+                            {typeof coins === "number" ? ` (${coins} เหรียญ)` : ""}
+                          </span>
                         </span>
                       )}
 
@@ -140,7 +153,7 @@ export function QueueFeed({
                   </div>
                 </div>
 
-                {/* Delete Button: ✕ button calling onDeleteItem(item.id) */}
+                {/* Delete Button calling onDeleteItem(item.id) */}
                 <button
                   type="button"
                   onClick={() => handleDeleteItem(item.id)}
@@ -148,7 +161,9 @@ export function QueueFeed({
                   title="ลบออกจากคิว (Delete)"
                   aria-label={`ลบข้อความของ ${username} ออกจากคิว`}
                 >
-                  ✕
+                  <span className="material-symbols-rounded text-sm leading-none select-none">
+                    close
+                  </span>
                 </button>
               </div>
             );

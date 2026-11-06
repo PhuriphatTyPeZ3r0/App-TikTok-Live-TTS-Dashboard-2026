@@ -83,20 +83,28 @@ export function NowSpeakingCard({
               {/* Green Live Broadcasting Tag */}
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#00e676]/10 text-[#00e676] border border-[#00e676]/30 shadow-[0_0_12px_rgba(0,230,118,0.2)]">
                 <span className="w-2 h-2 rounded-full bg-[#00e676] animate-pulse" />
-                <span>🟢 กำลังอ่านออกอากาศ</span>
+                <span className="material-symbols-rounded text-sm leading-none select-none">
+                  podcasts
+                </span>
+                <span>กำลังอ่านออกอากาศ</span>
               </span>
 
               {/* Amber Gift Priority Tag */}
               {isGift && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-[#ffb300]/15 text-[#ffb300] border border-[#ffb300]/40 shadow-[0_0_10px_rgba(255,179,0,0.25)]">
-                  <span>⚡ GIFT PRIORITY</span>
+                  <span className="material-symbols-rounded text-sm leading-none select-none">
+                    bolt
+                  </span>
+                  <span>GIFT PRIORITY</span>
                 </span>
               )}
             </>
           ) : (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800/80 text-slate-400 border border-slate-700/60">
-              <span className="w-2 h-2 rounded-full bg-slate-500" />
-              <span>⚪ สแตนด์บาย (Standby)</span>
+              <span className="material-symbols-rounded text-sm leading-none select-none">
+                radio_button_unchecked
+              </span>
+              <span>สแตนด์บาย (Standby)</span>
             </span>
           )}
         </div>
@@ -139,7 +147,7 @@ export function NowSpeakingCard({
         <div className="flex flex-col gap-3.5">
           {/* User Info Row */}
           <div className="flex items-center gap-3">
-            {/* Avatar (Emoji or Initials) */}
+            {/* Avatar (Material Symbol or Initials) */}
             <div
               className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shrink-0 border shadow-md ${
                 isGift
@@ -147,7 +155,13 @@ export function NowSpeakingCard({
                   : "bg-gradient-to-br from-cyan-400/20 to-blue-600/30 border-cyan-400/40 text-cyan-300"
               }`}
             >
-              {isGift ? "🎁" : avatarInitial}
+              {isGift ? (
+                <span className="material-symbols-rounded text-xl leading-none select-none">
+                  redeem
+                </span>
+              ) : (
+                avatarInitial
+              )}
             </div>
 
             {/* Username & Metadata */}
@@ -159,7 +173,10 @@ export function NowSpeakingCard({
 
                 {isGift && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-400/10 text-amber-300 border border-amber-400/30">
-                    <span>🎁 {giftName || "VIP Gift"}</span>
+                    <span className="material-symbols-rounded text-xs leading-none select-none">
+                      redeem
+                    </span>
+                    <span>{giftName || "VIP Gift"}</span>
                     {giftAmount && giftAmount > 1 ? <span>x{giftAmount}</span> : null}
                     {typeof coins === "number" && <span>({coins} เหรียญ)</span>}
                   </span>
@@ -210,7 +227,7 @@ export function NowSpeakingCard({
 
       {/* Action Buttons Row */}
       <div className="flex items-center gap-2 pt-3 border-t border-slate-800/80">
-        {/* ⏭️ Skip */}
+        {/* Skip */}
         <button
           type="button"
           onClick={onSkip}
@@ -218,11 +235,13 @@ export function NowSpeakingCard({
           className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm"
           title="ข้ามข้อความปัจจุบัน (Skip)"
         >
-          <span>⏭️</span>
+          <span className="material-symbols-rounded text-base leading-none select-none">
+            skip_next
+          </span>
           <span>Skip</span>
         </button>
 
-        {/* ⏸️ Pause / ▶️ Resume */}
+        {/* Pause / Resume */}
         <button
           type="button"
           onClick={onTogglePause}
@@ -234,18 +253,22 @@ export function NowSpeakingCard({
           }`}
           title={isPaused ? "เล่นต่อ (Resume)" : "พักชั่วคราว (Pause)"}
         >
-          <span>{isPaused ? "▶️" : "⏸️"}</span>
+          <span className="material-symbols-rounded text-base leading-none select-none">
+            {isPaused ? "play_arrow" : "pause"}
+          </span>
           <span>{isPaused ? "Resume" : "Pause"}</span>
         </button>
 
-        {/* 🗑️ Clear Queue */}
+        {/* Clear Queue */}
         <button
           type="button"
           onClick={onClearQueue}
           className="ml-auto px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
           title="ล้างคิวทั้งหมด (Clear Queue)"
         >
-          <span>🗑️</span>
+          <span className="material-symbols-rounded text-base leading-none select-none">
+            delete_sweep
+          </span>
           <span>Clear Queue</span>
         </button>
       </div>

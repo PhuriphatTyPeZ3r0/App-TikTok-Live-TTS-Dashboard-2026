@@ -35,14 +35,15 @@ export interface TikFinitySettingsProps {
 interface TabDefinition {
   id: SettingsTabId;
   label: string;
+  icon: string;
 }
 
 const TABS: TabDefinition[] = [
-  { id: "chat", label: "💬 Chat TTS" },
-  { id: "voices", label: "🎙️ Voice Profiles (โมเดลเสียง)" },
-  { id: "gift", label: "🎁 Gift Alerts & TTS" },
-  { id: "safety", label: "🛡️ Safety & Filters" },
-  { id: "obs", label: "📺 OBS & Output" },
+  { id: "chat", label: "Chat TTS", icon: "chat" },
+  { id: "voices", label: "Voice Profiles (โมเดลเสียง)", icon: "record_voice_over" },
+  { id: "gift", label: "Gift Alerts & TTS", icon: "redeem" },
+  { id: "safety", label: "Safety & Filters", icon: "shield" },
+  { id: "obs", label: "OBS & Output", icon: "live_tv" },
 ];
 
 export function TikFinitySettings({
@@ -81,7 +82,10 @@ export function TikFinitySettings({
                   : "bg-transparent text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/[0.04]"
               }`}
             >
-              {tab.label}
+              <span className="material-symbols-rounded text-base leading-none select-none">
+                {tab.icon}
+              </span>
+              <span>{tab.label}</span>
             </button>
           );
         })}

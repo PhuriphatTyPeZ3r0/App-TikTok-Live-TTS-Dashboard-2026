@@ -166,12 +166,15 @@ export function OBSIntegrationCard({
             <span className="text-neutral-900 dark:text-white font-bold">240 px</span>
           </div>
         </div>
-        <p className="text-[11px] text-amber-700 dark:text-amber-300/90 pt-0.5">
-          💡 สำคัญ: อย่าลืมติ๊กถูกที่ช่อง{" "}
+        <p className="text-[11px] text-amber-700 dark:text-amber-300/90 pt-0.5 flex items-center gap-1 flex-wrap">
+          <span className="material-symbols-rounded text-sm leading-none select-none">
+            lightbulb
+          </span>
+          <span>สำคัญ: อย่าลืมติ๊กถูกที่ช่อง</span>{" "}
           <strong className="text-neutral-900 dark:text-white font-semibold">
             &ldquo;Control audio via OBS&rdquo;
           </strong>{" "}
-          เพื่อให้เสียงเข้าไลฟ์
+          <span>เพื่อให้เสียงเข้าไลฟ์</span>
         </p>
       </div>
     </div>

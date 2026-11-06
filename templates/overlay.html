@@ -27,11 +27,11 @@
 
   <!-- Glassmorphism Visual Alert Popup Container -->
   <div id="overlay-alert" class="overlay-alert-card" style="backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); background: rgba(255,255,255,0.1); border-radius: 16px; border: 1px solid rgba(255,255,255,0.2);">
-    <div id="alert-avatar" class="overlay-avatar">💬</div>
+    <div id="alert-avatar" class="overlay-avatar"><span class="material-symbols-rounded">chat</span></div>
     <div class="overlay-content">
       <div class="overlay-user">
         <span id="alert-username">@viewer</span>
-        <span id="alert-badge" class="overlay-gift-badge" style="display: none;">🎁 GIFT</span>
+        <span id="alert-badge" class="overlay-gift-badge" style="display: none;"><span class="material-symbols-rounded" style="font-size: 14px; vertical-align: middle;">redeem</span> GIFT</span>
       </div>
       <div id="alert-message" class="overlay-text">
         ข้อความแชทสดจากผู้ชม
@@ -60,12 +60,12 @@
       alertMessage.textContent = item.text || '';
 
       if (item.event_type === 'gift') {
-        alertAvatar.textContent = '🎁';
+        alertAvatar.innerHTML = '<span class="material-symbols-rounded">redeem</span>';
         alertAvatar.style.background = 'linear-gradient(135deg, #f59e0b, #ef4444)';
-        alertBadge.style.display = 'inline-block';
-        alertBadge.textContent = '🎁 GIFT';
+        alertBadge.style.display = 'inline-flex';
+        alertBadge.innerHTML = '<span class="material-symbols-rounded" style="font-size: 14px; vertical-align: middle; margin-right: 2px;">redeem</span> GIFT';
       } else {
-        alertAvatar.textContent = '💬';
+        alertAvatar.innerHTML = '<span class="material-symbols-rounded">chat</span>';
         alertAvatar.style.background = 'linear-gradient(135deg, var(--tiktok-cyan), var(--tiktok-red))';
         alertBadge.style.display = 'none';
       }
