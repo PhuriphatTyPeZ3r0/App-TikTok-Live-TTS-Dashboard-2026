@@ -16,7 +16,13 @@ import httpx
 
 from src.config import AppConfig
 from src.thai_normalizer import normalize_thai_speech
-from src.voice_registry import VoiceProfile, get_voice_profile
+from src.voice_registry import (
+    VoiceProfile,
+    VoiceTuning,
+    format_edge_prosody,
+    get_voice_profile,
+    normalize_voice_tuning,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,28 +102,70 @@ class TTSEngine:
         """Return whether Colab / ZeroGPU synthesis is preferred."""
         return bool(self._config.prefer_colab_tts)
 
-    def get_cache_path(self, text: str, voice_id: str) -> Path:
-        """Return the cache file path for ``text`` spoken by ``voice_id``."""
-        digest = hashlib.md5(f"{voice_id}_{text}".encode("utf-8")).hexdigest()
+    def get_cache_path(
+        self, text: str, voice_id: str, tuning: Optional[VoiceTuning] = None
+    ) -> Path:
+        """Return the cache file path for ``text`` spoken by ``voice_id``.
+
+        Default (or missing) tuning keeps the legacy digest so existing cache entries stay valid;
+        non-default tuning is appended to the key so different settings never collide.
+        """
+        if tuning is None or tuning.is_default():
+            key = f"{voice_id}_{text}"
+        else:
+            key = f"{voice_id}_{tuning.speed:.2f}_{tuning.pitch}_{tuning.volume}_{text}"
+        digest = hashlib.md5(key.encode("utf-8")).hexdigest()
         return self._config.cache_dir / f"{digest}.mp3"
 
-    async def _call_edge_tts_with_voice(self, text: str, edge_voice: str) -> bytes:
-        """Invoke _synthesize_edge_tts seamlessly across default and custom voice overrides."""
+    @staticmethod
+    def _tuning_kwargs(tuning: VoiceTuning) -> dict[str, VoiceTuning]:
+        """Return a ``tuning`` kwarg only for non-default tuning (keeps legacy mocks working)."""
+        return {} if tuning.is_default() else {"tuning": tuning}
+
+    async def _call_edge_tts_with_voice(
+        self, text: str, edge_voice: str, tuning: Optional[VoiceTuning] = None
+    ) -> bytes:
+        """Invoke _synthesize_edge_tts seamlessly across default and custom voice overrides.
+
+        Prosody keyword arguments are only forwarded for non-default tuning.
+        """
+        prosody: dict[str, str] = {}
+        if tuning is not None and not tuning.is_default():
+            rate, pitch, volume = format_edge_prosody(tuning)
+            prosody = {"rate": rate, "pitch": pitch, "volume": volume}
         if edge_voice == self._config.fallback_voice:
-            return await self._synthesize_edge_tts(text)
+            try:
+                return await self._synthesize_edge_tts(text, **prosody)
+            except TypeError:
+                if not prosody:
+                    raise
+                return await self._synthesize_edge_tts(text)
         try:
-            return await self._synthesize_edge_tts(text, voice=edge_voice)
+            return await self._synthesize_edge_tts(text, voice=edge_voice, **prosody)
         except TypeError:
             return await self._synthesize_edge_tts(text)
 
-    async def synthesize(self, text: str, voice_id: str | None = None) -> bytes:
+    async def synthesize(
+        self,
+        text: str,
+        voice_id: str | None = None,
+        *,
+        speed: float = 1.0,
+        pitch: int = 0,
+        volume: int = 100,
+    ) -> bytes:
         """Return MP3 bytes for ``text`` using ``voice_id`` profile after PyThaiNLP normalization.
+
+        ``speed``, ``pitch`` and ``volume`` are clamped via ``normalize_voice_tuning`` and applied
+        to Edge-TTS synthesis (direct profile or fallback). Fish Audio and Colab output is unchanged.
 
         Raises:
             RuntimeError: Primary and fallback engines failed or are disabled.
         """
         if not text or not text.strip():
             return b""
+
+        tuning = normalize_voice_tuning(speed, pitch, volume)
 
         normalized_text = normalize_thai_speech(text)
         if not normalized_text:
@@ -138,7 +186,9 @@ class TTSEngine:
 
         # 1. Edge-TTS Direct Profile (e.g. "niwat")
         if profile.engine == "edge_tts":
-            audio = await self._call_edge_tts_with_voice(normalized_text, profile.edge_voice)
+            audio = await self._call_edge_tts_with_voice(
+                normalized_text, profile.edge_voice, **self._tuning_kwargs(tuning)
+            )
             self.last_engine = "edge-tts"
             return audio
 
@@ -195,24 +245,40 @@ class TTSEngine:
         target_edge_voice = (
             self._config.fallback_voice if profile.id == "yuta" else profile.edge_voice
         )
-        audio = await self._call_edge_tts_with_voice(normalized_text, target_edge_voice)
+        audio = await self._call_edge_tts_with_voice(
+            normalized_text, target_edge_voice, **self._tuning_kwargs(tuning)
+        )
         self.last_engine = "edge-tts"
         return audio
 
-    async def synthesize_base64(self, text: str, voice_id: str | None = None) -> str:
+    async def synthesize_base64(
+        self,
+        text: str,
+        voice_id: str | None = None,
+        *,
+        speed: float = 1.0,
+        pitch: int = 0,
+        volume: int = 100,
+    ) -> str:
         """Return standard Base64-encoded string of synthesized MP3 audio for ``text``.
 
         Enables immediate WebSocket JSON payload transport to web overlays.
         """
         if not text or not text.strip():
             return ""
+        tuning_kwargs: dict[str, Any] = {}
+        if (speed, pitch, volume) != (1.0, 0, 100):
+            tuning_kwargs = {"speed": speed, "pitch": pitch, "volume": volume}
         if voice_id is not None:
             try:
-                audio_bytes = await self.synthesize(text, voice_id=voice_id)
+                audio_bytes = await self.synthesize(text, voice_id=voice_id, **tuning_kwargs)
             except TypeError:
                 audio_bytes = await self.synthesize(text)
         else:
-            audio_bytes = await self.synthesize(text)
+            try:
+                audio_bytes = await self.synthesize(text, **tuning_kwargs)
+            except TypeError:
+                audio_bytes = await self.synthesize(text)
         return base64.b64encode(audio_bytes).decode("ascii")
 
     async def warm_remote_engine(self, timeout: float = 3.0) -> bool:
@@ -310,13 +376,27 @@ class TTSEngine:
         return response.content
 
     async def _synthesize_edge_tts(
-        self, text: str, voice: Optional[str] = None
+        self,
+        text: str,
+        voice: Optional[str] = None,
+        *,
+        rate: str = "+0%",
+        pitch: str = "+0Hz",
+        volume: str = "+0%",
     ) -> bytes:
         # Imported lazily so the rest of the bot (and tests) work without edge-tts installed.
         import edge_tts
 
         target_voice = voice or self._config.fallback_voice
-        communicate = edge_tts.Communicate(text, target_voice)
+        if rate == "+0%" and pitch == "+0Hz" and volume == "+0%":
+            communicate = edge_tts.Communicate(text, target_voice)
+        else:
+            try:
+                communicate = edge_tts.Communicate(
+                    text, target_voice, rate=rate, pitch=pitch, volume=volume
+                )
+            except TypeError:
+                communicate = edge_tts.Communicate(text, target_voice)
         chunks = [chunk["data"] async for chunk in communicate.stream() if chunk["type"] == "audio"]
         data = b"".join(chunks)
         if not data:

@@ -8,8 +8,78 @@ cloning models and Microsoft Edge-TTS Neural fallback voices.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import math
 import os
 from typing import Any
+
+SPEED_MIN, SPEED_MAX, SPEED_DEFAULT = 0.5, 2.0, 1.0
+PITCH_MIN, PITCH_MAX, PITCH_DEFAULT = -50, 50, 0
+VOLUME_MIN, VOLUME_MAX, VOLUME_DEFAULT = 0, 200, 100
+
+
+@dataclass
+class VoiceTuning:
+    """Per-voice acoustic tuning parameters.
+
+    Attributes:
+        speed: Speaking rate multiplier in [0.5, 2.0] (1.0 is normal speed).
+        pitch: Pitch offset in Hertz (Hz) in [-50, 50] (0 is unchanged).
+        volume: Volume percentage in [0, 200] (100 is unchanged).
+    """
+
+    speed: float = SPEED_DEFAULT
+    pitch: int = PITCH_DEFAULT
+    volume: int = VOLUME_DEFAULT
+
+    def is_default(self) -> bool:
+        """Return True when every parameter equals its neutral default."""
+        return (
+            self.speed == SPEED_DEFAULT
+            and self.pitch == PITCH_DEFAULT
+            and self.volume == VOLUME_DEFAULT
+        )
+
+
+def _coerce_number(value: Any, default: float) -> float:
+    """Coerce numbers or numeric strings to a finite float, else return ``default``."""
+    if value is None or isinstance(value, bool):
+        return default
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not math.isfinite(number):
+        return default
+    return number
+
+
+def normalize_voice_tuning(
+    speed: Any = SPEED_DEFAULT, pitch: Any = PITCH_DEFAULT, volume: Any = VOLUME_DEFAULT
+) -> VoiceTuning:
+    """Clamp and coerce raw tuning inputs into a valid VoiceTuning.
+
+    Invalid or missing values fall back to the neutral defaults without raising.
+    """
+    clean_speed = _coerce_number(speed, SPEED_DEFAULT)
+    clean_pitch = _coerce_number(pitch, PITCH_DEFAULT)
+    clean_volume = _coerce_number(volume, VOLUME_DEFAULT)
+    return VoiceTuning(
+        speed=round(min(max(clean_speed, SPEED_MIN), SPEED_MAX), 2),
+        pitch=int(round(min(max(clean_pitch, PITCH_MIN), PITCH_MAX))),
+        volume=int(round(min(max(clean_volume, VOLUME_MIN), VOLUME_MAX))),
+    )
+
+
+def format_edge_prosody(tuning: VoiceTuning | None) -> tuple[str, str, str]:
+    """Format tuning as ``(rate, pitch, volume)`` strings accepted by ``edge-tts``."""
+    t = normalize_voice_tuning(
+        tuning.speed if tuning else SPEED_DEFAULT,
+        tuning.pitch if tuning else PITCH_DEFAULT,
+        tuning.volume if tuning else VOLUME_DEFAULT,
+    )
+    rate_pct = int(round((t.speed - 1.0) * 100))
+    volume_pct = t.volume - 100
+    return f"{rate_pct:+d}%", f"{t.pitch:+d}Hz", f"{volume_pct:+d}%"
 
 
 @dataclass
@@ -33,6 +103,9 @@ class VoiceProfile:
     model_id: str | None = None
     edge_voice: str = "th-TH-NiwatNeural"
     is_default: bool = False
+    default_speed: float = SPEED_DEFAULT
+    default_pitch: int = PITCH_DEFAULT
+    default_volume: int = VOLUME_DEFAULT
 
 
 def _env_or_none(key: str) -> str | None:

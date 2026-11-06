@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Prompt,
 
-    [string]$Model = "omniroute/auto/best-coding",
+    [string]$Model = "omniroute/antigravity/claude-sonnet-5-5-high",
 
     [string]$File = "",
 
@@ -34,20 +34,21 @@ if (-not $env:OMNIROUTE_API_KEY) {
 }
 
 if ($DryRun) {
-    Write-Output "[DRY-RUN] WorkDir=$WorkDir | opencode run --auto --standalone -m $Model `"$Prompt`""
+    Write-Output "[DRY-RUN] WorkDir=$WorkDir | Model=$Model (omniroute/auto/best-coding compatible) | opencode run --auto -m $Model `"$Prompt`""
     exit 0
 }
 
 Push-Location $WorkDir
 try {
-    $argsList = @("run", "--auto", "--standalone", "-m", $Model)
+    $argsList = @("run", "--auto", "-m", $Model)
     if ($File -and (Test-Path $File)) {
         $argsList += @("-f", $File)
     }
     $argsList += $Prompt
 
     Write-Host ">>> Dispatching task to OpenCode ($Model)..." -ForegroundColor Cyan
-    & opencode @argsList
+    # Pipe empty string to close stdin immediately so non-TTY subprocesses do not block waiting on EOF
+    "" | & opencode @argsList
     if ($LASTEXITCODE -ne 0) {
         throw "opencode exited with code $LASTEXITCODE"
     }

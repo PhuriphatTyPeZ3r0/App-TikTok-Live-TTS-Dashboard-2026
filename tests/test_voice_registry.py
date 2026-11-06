@@ -8,7 +8,15 @@ import pytest
 from src.config import AppConfig
 from src.session_manager import SessionManager
 from src.tts_engine import TTSEngine
-from src.voice_registry import VOICE_PROFILES, VoiceProfile, get_voice_profile, list_voice_profiles
+from src.voice_registry import (
+    VOICE_PROFILES,
+    VoiceProfile,
+    VoiceTuning,
+    format_edge_prosody,
+    get_voice_profile,
+    list_voice_profiles,
+    normalize_voice_tuning,
+)
 
 
 def test_default_voice_profile():
@@ -187,3 +195,77 @@ async def test_session_manager_voice_state_tracking():
     assert enqueued is True
     queued_item = session.queue_manager.get_nowait()
     assert queued_item.voice_id == "joker"
+
+
+def test_normalize_voice_tuning_clamps_and_handles_invalid_inputs():
+    t1 = normalize_voice_tuning(speed=3.5, pitch=-90, volume=250)
+    assert (t1.speed, t1.pitch, t1.volume) == (2.0, -50, 200)
+
+    t2 = normalize_voice_tuning(speed=0.1, pitch=80, volume=-10)
+    assert (t2.speed, t2.pitch, t2.volume) == (0.5, 50, 0)
+
+    t3 = normalize_voice_tuning(speed="invalid", pitch=None, volume="bad")
+    assert (t3.speed, t3.pitch, t3.volume) == (1.0, 0, 100)
+
+    t4 = normalize_voice_tuning(speed="1.5", pitch="10", volume="120")
+    assert (t4.speed, t4.pitch, t4.volume) == (1.5, 10, 120)
+
+    t5 = normalize_voice_tuning(speed=-5, pitch=999, volume=-20)
+    assert (t5.speed, t5.pitch, t5.volume) == (0.5, 50, 0)
+
+
+def test_format_edge_prosody_formats_rate_pitch_volume():
+    default_prosody = format_edge_prosody(VoiceTuning(1.0, 0, 100))
+    assert default_prosody == ("+0%", "+0Hz", "+0%")
+    assert format_edge_prosody(None) == ("+0%", "+0Hz", "+0%")
+
+    custom_prosody = format_edge_prosody(VoiceTuning(1.25, -12, 80))
+    assert custom_prosody == ("+25%", "-12Hz", "-20%")
+
+    assert format_edge_prosody(VoiceTuning(0.8, 10, 130)) == ("-20%", "+10Hz", "+30%")
+
+
+def test_tts_engine_cache_path_includes_non_default_tuning(tmp_path):
+    engine = TTSEngine(cache_dir=tmp_path)
+    p_default = engine.get_cache_path("สวัสดี", "yuta")
+    p_same = engine.get_cache_path("สวัสดี", "yuta", VoiceTuning(1.0, 0, 100))
+    p_fast = engine.get_cache_path("สวัสดี", "yuta", VoiceTuning(1.5, 10, 120))
+    assert p_default == p_same
+    assert p_default != p_fast
+
+
+def test_voice_profile_has_default_tuning_fields():
+    profile = get_voice_profile("yuta")
+    assert (profile.default_speed, profile.default_pitch, profile.default_volume) == (1.0, 0, 100)
+
+
+@pytest.mark.asyncio
+async def test_edge_tts_default_tuning_uses_legacy_two_arg_communicate(tmp_path: Path):
+    engine = TTSEngine(cache_dir=tmp_path)
+
+    async def fake_stream():
+        yield {"type": "audio", "data": b"AUDIO"}
+
+    with patch("edge_tts.Communicate") as mock_comm:
+        mock_comm.return_value.stream = fake_stream
+        audio = await engine.synthesize("สวัสดีครับ", voice_id="niwat")
+    assert audio == b"AUDIO"
+    mock_comm.assert_called_once_with("สวัสดีครับ", "th-TH-NiwatNeural")
+
+
+@pytest.mark.asyncio
+async def test_edge_tts_non_default_tuning_passes_prosody(tmp_path: Path):
+    engine = TTSEngine(cache_dir=tmp_path)
+
+    async def fake_stream():
+        yield {"type": "audio", "data": b"AUDIO"}
+
+    with patch("edge_tts.Communicate") as mock_comm:
+        mock_comm.return_value.stream = fake_stream
+        audio = await engine.synthesize(
+            "สวัสดีครับ", voice_id="niwat", speed=1.25, pitch=-12, volume=80
+        )
+    assert audio == b"AUDIO"
+    mock_comm.assert_called_once_with(
+        "สวัสดีครับ", "th-TH-NiwatNeural", rate="+25%", pitch="-12Hz", volume="-20%"
+    )
