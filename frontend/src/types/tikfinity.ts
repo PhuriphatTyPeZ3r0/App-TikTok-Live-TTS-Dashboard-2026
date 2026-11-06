@@ -1,7 +1,19 @@
 /**
- * TikFinity-style TTS Dashboard Type Definitions
+ * StreamVox Live & TikFinity-style Text-to-Speech (TTS) Dashboard Type Definitions
  * Single-Page Application (SPA) configuration contract for real-time TikTok Live stream speech synthesis.
+ *
+ * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  */
+
+export interface VoiceProfileInfo {
+  id: string;
+  name: string;
+  description: string;
+  engine: 'fish_audio' | 'edge_tts';
+  model_id?: string | null;
+  edge_voice?: string;
+  is_default?: boolean;
+}
 
 export interface TikFinitySettings {
   masterTtsEnabled: boolean;
@@ -18,6 +30,7 @@ export interface TikFinitySettings {
   blacklistedUsers: string[];
   inDashboardAudio: boolean;
   volume: number;
+  selectedVoiceId?: string;
 }
 
 export interface QueueItem {
@@ -30,6 +43,7 @@ export interface QueueItem {
   coins?: number;
   timestamp: number;
   isTest?: boolean;
+  voiceId?: string;
 }
 
 export const DEFAULT_TIKFINITY_SETTINGS: TikFinitySettings = {
@@ -47,4 +61,5 @@ export const DEFAULT_TIKFINITY_SETTINGS: TikFinitySettings = {
   blacklistedUsers: [],
   inDashboardAudio: true,
   volume: 1.0,
+  selectedVoiceId: 'yuta',
 };

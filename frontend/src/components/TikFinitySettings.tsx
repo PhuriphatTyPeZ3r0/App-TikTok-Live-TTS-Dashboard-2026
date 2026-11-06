@@ -1,25 +1,33 @@
 "use client";
 
 /**
- * TikFinitySettings Component
+ * TikFinitySettings Component for StreamVox Live.
  *
- * TikFinity-style Tabbed Settings Panel for TikTok Live Text-to-Speech (TTS) stream console.
- * Implements dark glassmorphism styling and sub-tabs for Chat TTS, Gift Alerts & TTS,
+ * StreamVox Live & TikFinity-style Tabbed Settings Panel for TikTok Live Text-to-Speech (TTS)
+ * stream console. Implements dark glassmorphism styling, embedded Multi-Voice Selector,
+ * and sub-tabs for Chat TTS, Voice Profiles (โมเดลเสียง), Gift Alerts & TTS,
  * Safety & Filters, and Open Broadcaster Software (OBS Studio) Integration.
+ *
+ * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  */
 
 import React, { useState } from "react";
 import { TikFinitySettings as TikFinitySettingsType } from "../types/tikfinity";
+import { VoiceSelector } from "./VoiceSelector";
 import { TabChatSettings } from "./tabs/TabChatSettings";
 import { TabGiftSettings } from "./tabs/TabGiftSettings";
 import { TabSafetySettings } from "./tabs/TabSafetySettings";
 import { TabObsSettings } from "./tabs/TabObsSettings";
 
-export type SettingsTabId = "chat" | "gift" | "safety" | "obs";
+export type SettingsTabId = "chat" | "voices" | "gift" | "safety" | "obs";
 
 export interface TikFinitySettingsProps {
   settings: TikFinitySettingsType;
   onUpdate: (partial: Partial<TikFinitySettingsType>) => void;
+  onSelectVoice?: (voiceId: string) => void;
+  onTestVoice?: (voiceId: string, sampleText: string) => void | Promise<any>;
+  backendUrl?: string;
+  testingVoiceId?: string | null;
   sessionId?: string;
   className?: string;
 }
@@ -31,6 +39,7 @@ interface TabDefinition {
 
 const TABS: TabDefinition[] = [
   { id: "chat", label: "💬 Chat TTS" },
+  { id: "voices", label: "🎙️ Voice Profiles (โมเดลเสียง)" },
   { id: "gift", label: "🎁 Gift Alerts & TTS" },
   { id: "safety", label: "🛡️ Safety & Filters" },
   { id: "obs", label: "📺 OBS & Output" },
@@ -39,10 +48,19 @@ const TABS: TabDefinition[] = [
 export function TikFinitySettings({
   settings,
   onUpdate,
+  onSelectVoice,
+  onTestVoice,
+  backendUrl = "",
+  testingVoiceId = null,
   sessionId,
   className = "",
 }: TikFinitySettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>("chat");
+
+  const handleVoiceChange = (voiceId: string) => {
+    onUpdate({ selectedVoiceId: voiceId });
+    onSelectVoice?.(voiceId);
+  };
 
   return (
     <div
@@ -70,9 +88,29 @@ export function TikFinitySettings({
       </div>
 
       {/* Tab Panels */}
-      <div className="flex flex-col">
+      <div className="flex flex-col gap-5">
         {activeTab === "chat" && (
-          <TabChatSettings settings={settings} onUpdate={onUpdate} />
+          <>
+            <VoiceSelector
+              selectedVoiceId={settings.selectedVoiceId || "yuta"}
+              onSelectVoice={handleVoiceChange}
+              onTestVoice={onTestVoice}
+              backendUrl={backendUrl}
+              testingVoiceId={testingVoiceId}
+            />
+            <div className="border-t border-[#1e222d] pt-4">
+              <TabChatSettings settings={settings} onUpdate={onUpdate} />
+            </div>
+          </>
+        )}
+        {activeTab === "voices" && (
+          <VoiceSelector
+            selectedVoiceId={settings.selectedVoiceId || "yuta"}
+            onSelectVoice={handleVoiceChange}
+            onTestVoice={onTestVoice}
+            backendUrl={backendUrl}
+            testingVoiceId={testingVoiceId}
+          />
         )}
         {activeTab === "gift" && (
           <TabGiftSettings settings={settings} onUpdate={onUpdate} />

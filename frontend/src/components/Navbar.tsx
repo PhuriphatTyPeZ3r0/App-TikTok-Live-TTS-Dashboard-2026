@@ -1,35 +1,26 @@
 "use client";
 
 /**
- * TikFinity-Style Navigation Bar Component for Next.js 15.
+ * StreamVox Live & TikFinity-Style Navigation Bar Component for Next.js 15.
  *
- * Implements TikFinity-inspired header design:
- * - Brand logo: "TF" with pink/cyan gradient box
- * - Title: "TikTok Live TTS Stream Console"
- * - Subtitle: "TikFinity Cleansed Edition • 24/7 Cloud Powered"
+ * Implements StreamVox Live broadcast studio header design:
+ * - Brand logo with Google Material Symbols (`graphic_eq`) in pink/cyan gradient box
+ * - Title: "StreamVox Live" with `v2.1 PRO` pill badge
+ * - Subtitle: "TikTok Live Text-to-Speech (TTS) Studio • PyThaiNLP & Multi-Voice Powered"
  * - Status badges:
  *     - LIVE badge with pulsing dot: `LIVE: @{username || 'phuriphat_live'}`
- *     - Voice engine badge: `🎙️ Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ)`
- * - Quick Voice Test button with loading indicator
+ *     - Active Voice profile badge: `🎙️ {activeEngine}`
+ * - Quick Voice Test button with Google Material Symbols (`volume_up`) and loading indicator
  * - TTS Master toggle switch (masterTtsEnabled / onToggleMaster)
  * - Optional theme toggler and account/room switcher
  *
- * Voice Actor Model: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Voice Actor Attribution: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Architecture: Single-Page Application (SPA) communicating with Asynchronous Server Gateway Interface (ASGI)
+ * over WebSockets (WS).
  */
 
 import React, { useState } from "react";
-import {
-  Volume2,
-  Loader2,
-  Sun,
-  Moon,
-  Tv,
-  Copy,
-  Check,
-  ExternalLink,
-  User,
-  Radio,
-} from "lucide-react";
+import { Loader2, Sun, Moon, User } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 export interface NavbarProps {
@@ -57,6 +48,8 @@ export interface NavbarProps {
   isTestingVoice?: boolean;
   /** Active voice synthesis engine name. Defaults to Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ). */
   activeEngine?: string;
+  /** Currently selected voice profile ID (e.g., "yuta", "hana", "joker", "anchor", "niwat"). */
+  selectedVoiceId?: string;
   /** Callback to open or toggle the Room Switcher / Session Start dialog. */
   onOpenRoomModal?: () => void;
   /** Callback to switch TikTok accounts or open creator switcher dialog. */
@@ -68,6 +61,14 @@ export interface NavbarProps {
   /** Optional custom className */
   className?: string;
 }
+
+const VOICE_BADGE_LABELS: Record<string, string> = {
+  yuta: "พิพัฒน์ บุญสิทธิเลิศ (Yuta • Fish Audio)",
+  hana: "ฮานะ (Hana Sweet • Fish Audio)",
+  joker: "ดีเจโจ๊กเกอร์ (DJ Joker • Fish Audio)",
+  anchor: "ผู้ประกาศข่าว ชาย (News Anchor • Fish Audio)",
+  niwat: "นิวัฒน์ (Niwat Neural • Edge-TTS)",
+};
 
 export function Navbar({
   username = "phuriphat_live",
@@ -81,7 +82,8 @@ export function Navbar({
   onToggleMaster,
   onTestVoice,
   isTestingVoice = false,
-  activeEngine = "Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ)",
+  activeEngine,
+  selectedVoiceId = "yuta",
   onOpenRoomModal,
   onSwitchAccount,
   onOpenOBSPreview,
@@ -92,6 +94,11 @@ export function Navbar({
 
   // Clean creator handle for display
   const displayUser = username.replace(/^@/, "").trim() || "phuriphat_live";
+
+  const resolvedEngineLabel =
+    activeEngine ||
+    VOICE_BADGE_LABELS[selectedVoiceId] ||
+    "Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ)";
 
   // OBS Overlay URL calculation
   const cleanBackendUrl = (backendUrl || "").replace(/\/+$/, "");
@@ -115,24 +122,29 @@ export function Navbar({
   return (
     <header
       className={`sticky top-0 z-50 w-full bg-[#12141a]/95 backdrop-blur-md border-b border-[#1e222d] px-4 md:px-6 py-3 shadow-lg flex items-center justify-between gap-4 transition-colors ${className}`}
-      aria-label="TikFinity TTS Master Navigation Bar"
+      aria-label="StreamVox Live Master Navigation Bar"
     >
       {/* Left Section: Brand Logo & Title */}
       <div className="flex items-center gap-3 shrink-0">
         <div
           className="w-[38px] h-[38px] rounded-lg bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center font-extrabold text-black text-lg select-none shadow-md shrink-0"
-          title="TikFinity TTS Console"
+          title="StreamVox Live TTS Console"
         >
-          TF
+          <span className="material-symbols-rounded text-xl text-black select-none">
+            graphic_eq
+          </span>
         </div>
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
             <h1 className="font-bold text-sm sm:text-base tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-300 bg-clip-text text-transparent">
-              TikTok Live TTS Stream Console
+              StreamVox Live
             </h1>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gradient-to-r from-[#fe2c55] to-[#25f4ee] text-black tracking-wide shadow-sm">
+              v2.1 PRO
+            </span>
           </div>
           <p className="text-[11px] text-slate-400 font-normal hidden sm:block">
-            TikFinity Cleansed Edition • 24/7 Cloud Powered
+            TikTok Live TTS Stream Console • PyThaiNLP &amp; Multi-Voice Studio
           </p>
         </div>
       </div>
@@ -154,10 +166,12 @@ export function Navbar({
         {/* Voice Engine Badge */}
         <div
           className="hidden md:flex items-center gap-1.5 bg-[#25f4ee]/10 border border-[#25f4ee]/25 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#25f4ee] shadow-sm"
-          title={`Active Voice Engine: ${activeEngine}`}
+          title={`Active Voice Engine: ${resolvedEngineLabel}`}
         >
-          <span>🎙️</span>
-          <span className="truncate max-w-[220px]">{activeEngine}</span>
+          <span className="material-symbols-rounded text-base select-none">
+            record_voice_over
+          </span>
+          <span className="truncate max-w-[240px]">{resolvedEngineLabel}</span>
         </div>
 
         {/* Quick Voice Test Button */}
@@ -172,7 +186,9 @@ export function Navbar({
             {isTestingVoice ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin text-[#25f4ee]" />
             ) : (
-              <Volume2 className="w-3.5 h-3.5 text-[#25f4ee]" />
+              <span className="material-symbols-rounded text-base text-[#25f4ee] select-none">
+                volume_up
+              </span>
             )}
             <span className="hidden sm:inline">
               {isTestingVoice ? "กำลังทดสอบ..." : "ทดสอบเสียง"}
@@ -202,7 +218,11 @@ export function Navbar({
           type="button"
           onClick={toggleTheme}
           className="p-2 rounded-lg bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] text-slate-300 hover:text-white transition-colors"
-          title={theme === "dark" ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)" : "เปลี่ยนเป็นโหมดมืด (Dark Cinema Mode)"}
+          title={
+            theme === "dark"
+              ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)"
+              : "เปลี่ยนเป็นโหมดมืด (Dark Cinema Mode)"
+          }
           aria-label="Toggle theme color scheme"
         >
           {theme === "dark" ? (
