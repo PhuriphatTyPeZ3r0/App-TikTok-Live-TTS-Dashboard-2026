@@ -88,26 +88,30 @@ StreamVox Live ถูกออกแบบขึ้นมาเพื่อย�
 ### 4.2 Multi-Voice Model Architecture
 ระบบรองรับ 5 โปรไฟล์เสียงที่คัดเลือกมาอย่างเหมาะสม:
 1. **พิพัฒน์ บุญสิทธิเลิศ (Yuta - Primary):** Model ID `9c110ffde8bc42709516395dfbcfb4a2` บน Fish Audio (เสียงมาตรฐานสำหรับพูดคุยทั่วไป)
-2. **ฮานะ (Hana Sweet - Anime):** Model ID สาวหวาน อนิเมะ น่ารัก สดใส
+2. **ฮานะ (Hana Sweet - Anime Female):** โมเดลเสียงสาวหวาน อนิเมะ น่ารัก สดใส (จับคู่กับ `th-TH-PremwadeeNeural` บน Edge-TTS เมื่อต้องการความเร็วสูงหรือสำรองฟรี)
 3. **ดีเจโจ๊กเกอร์ (DJ Hype - Comedy):** โมเดลเสียงกระตือรือร้น เฮฮา เหมาะกับการอ่านของขวัญ
 4. **ผู้ประกาศข่าว ชาย (News Anchor Pro):** โมเดลเสียงทุ้ม ชัด สุภาพ
 5. **นิวัฒน์ นิวรัล (Niwat Neural - Fallback):** Microsoft Edge-TTS (`th-TH-NiwatNeural`) ฟรี ไม่จำกัดโควต้า ค่าความหน่วงต่ำ (<1s)
 
-**Data Contract & State:**
-- เพิ่ม `selectedVoiceId: string` ใน `TikFinitySettings` (บันทึกใน `localStorage`)
-- ส่งพารามิเตอร์ `voice_id` ไปใน Request สังเคราะห์เสียง (`POST /api/session/{id}/test-voice`)
+**Data Contract & State Synchronization:**
+- เพิ่ม `selected_voice_id` บน `SessionInstance` ใน Backend เพื่อให้แชทที่ถูก Ingest มาจาก TikTok ทำการสังเคราะห์เสียงด้วยโปรไฟล์ที่สตรีมเมอร์เลือกเสมอ
+- หน้า Dashboard ส่งคำสั่งอัปเดตผ่าน WebSocket: `{ "action": "set_voice", "voice_id": "yuta" }` และ REST API `/api/session/{id}/voice`
+- บันทึก `selectedVoiceId` ใน `localStorage` ของ Dashboard เพื่อจดจำค่าอัตโนมัติ
 
 ### 4.3 PyThaiNLP Text Normalization Pipeline
 สร้างโมดูล `src/thai_normalizer.py` โดยมีขั้นตอนการแปลง:
-1. **Slang & Abbreviations Normalization:**
+1. **ตำแหน่งการประมวลผล (Pipeline Scope):**
+   - ประมวลผลภายใน `TTSEngine.synthesize()` ก่อนส่งเข้า API สังเคราะห์เสียง
+   - **หน้าจอ UI, คิว และ OBS Overlay จะยังคงแสดงข้อความต้นฉบับของผู้ใช้ (เช่น "555 Live สนุกมาก")** เพื่อให้สตรีมเมอร์และผู้ชมเห็นแชทจริง แต่เสียงที่พูดออกมาจะเป็นเสียงที่ถอดคำอ่านถูกต้อง ("ห้าห้าห้า ไลฟ์ สนุกมาก")
+2. **Slang & Abbreviations Normalization:**
    - แปลงเลขขำ: `r'([5]+)'` -> `"ห้า"` ซ้ำตามจำนวนหรือยุบให้อ่านเป็นธรรมชาติ
    - แปลงคำย่อ: `กุ` -> `กู`, `มุง` -> `มึง`, `จิง` -> `จริง`, `คับ/งับ` -> `ครับ`, `ป่าว/ป้ะ` -> `หรือเปล่า`
-2. **English Loanword Transliteration:**
+3. **English Loanword Transliteration:**
    - พจนานุกรมคำยอดนิยมในไลฟ์: `Live` -> `ไลฟ์`, `Stream` -> `สตรีม`, `Game` -> `เกม`, `PK` -> `พีเค`, `Gift` -> `กิฟต์`, `ROV` -> `อาร์โอวี`
-3. **Word Tokenization & Pacing Adjustment:**
+4. **Word Tokenization & Pacing Adjustment:**
    - ใช้ `pythainlp.tokenize.word_tokenize(text, engine='newmm')` เพื่อตัดคำ
    - แทรกเว้นวรรคบางๆ ในจุดที่เหมาะสม เพื่อให้โมเดล AI อ่านเป็นจังหวะจะโคน ไม่รัวหรือกลืนเสียง
-4. **Performance & Caching:**
+5. **Performance & Caching:**
    - ใช้ `@functools.lru_cache(maxsize=2048)` สำหรับประโยคที่พบบ่อย ลดเวลาประมวลผลเหลือ < 1ms
 
 ---
