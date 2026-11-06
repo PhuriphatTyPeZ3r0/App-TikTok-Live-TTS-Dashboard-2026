@@ -19,10 +19,11 @@ import uuid
 from src.ingestion import TikTokIngestionService
 from src.normalizer import TextNormalizer
 try:
-    from src.queue_manager import TTSQueueManager
+    from src.queue_manager import TTSItem, TTSQueueManager
 except ImportError:
-    from src.queue_manager import TextQueueManager as TTSQueueManager  # type: ignore[attr-defined]
+    from src.queue_manager import SpeechItem as TTSItem, TextQueueManager as TTSQueueManager  # type: ignore[attr-defined]
 from src.tts_engine import TTSEngine
+from src.voice_registry import get_voice_profile
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class SessionInstance:
         normalizer: TextNormalizer instance configured with default and custom phonetic rules.
         queue_manager: First-In, First-Out (FIFO) TTSQueueManager for speech task ordering.
         tts_engine: TTSEngine instance configured for session-specific voice synthesis.
+        selected_voice_id: Currently active voice profile ID for this session (default: "yuta").
         proxy_url: Optional HTTP or SOCKS5 proxy URL to circumvent datacenter IP throttling.
         enable_comments: Whether regular viewer comments are converted to speech.
         enable_gifts: Whether virtual gifts trigger priority speech synthesis.
@@ -60,6 +62,7 @@ class SessionInstance:
     normalizer: TextNormalizer
     queue_manager: TTSQueueManager
     tts_engine: Optional[TTSEngine] = None
+    selected_voice_id: str = "yuta"
     proxy_url: Optional[str] = None
     enable_comments: bool = True
     enable_gifts: bool = True
@@ -86,6 +89,56 @@ class SessionInstance:
         if self.ingestion_service is not None:
             return getattr(self.ingestion_service, "_running", False) or self._is_running
         return self._is_running
+
+    async def enqueue_speech(
+        self,
+        text: str,
+        user_id: str = "anonymous",
+        is_gift: bool = False,
+        voice_id: Optional[str] = None,
+    ) -> bool:
+        """Enqueue a speech job into the session's queue carrying the session's selected voice ID.
+
+        Args:
+            text: Speech text to enqueue.
+            user_id: Identifier of the viewer or sender.
+            is_gift: True if the speech item is a priority gift announcement.
+            voice_id: Optional voice ID override; defaults to self.selected_voice_id.
+
+        Returns:
+            bool: True if enqueued successfully, False otherwise.
+        """
+        if not text or not text.strip():
+            return False
+
+        target_voice_id = get_voice_profile(voice_id or self.selected_voice_id).id
+        self.touch()
+
+        if is_gift:
+            item = TTSItem(
+                text=text,
+                user_id=user_id,
+                event_type="gift",
+                priority=0,
+                is_gift=True,
+            )
+            setattr(item, "voice_id", target_voice_id)
+            return self.queue_manager.put(item)
+
+        if self.queue_manager.get_queue_size() >= self.queue_manager.max_size:
+            return False
+        if self.queue_manager.is_spam(user=user_id, text=text):
+            return False
+
+        item = TTSItem(
+            text=text,
+            user_id=user_id,
+            event_type="comment",
+            priority=1,
+            is_gift=False,
+        )
+        setattr(item, "voice_id", target_voice_id)
+        return self.queue_manager.put(item)
 
     async def start(self) -> None:
         """Start the live stream session and underlying live event ingestion loop."""
@@ -138,6 +191,7 @@ class SessionManager:
         prefer_colab_tts: bool = True,
         colab_tts_timeout_seconds: float = 5.0,
         hf_token: Optional[str] = None,
+        selected_voice_id: str = "yuta",
     ) -> SessionInstance:
         """Create and register a new multi-tenant live stream session.
 
@@ -161,6 +215,7 @@ class SessionManager:
             prefer_colab_tts: Flag prioritizing Google Colab Edge-TTS over local fallback.
             colab_tts_timeout_seconds: Request timeout in seconds for Colab TTS synthesis.
             hf_token: Optional Bearer authentication token for Hugging Face (HF) Spaces / Zero-cost Graphics Processing Unit (ZeroGPU).
+            selected_voice_id: Initial voice profile identifier (defaults to "yuta").
 
         Returns:
             SessionInstance: The newly created and registered session instance.
@@ -201,6 +256,7 @@ class SessionManager:
             tts_engine._config.colab_tts_timeout_seconds = colab_tts_timeout_seconds
             tts_engine._config.hf_token = hf_token
 
+        resolved_voice_id = get_voice_profile(selected_voice_id).id
         now = time.time()
         instance = SessionInstance(
             session_id=session_id,
@@ -211,6 +267,7 @@ class SessionManager:
             normalizer=normalizer,
             queue_manager=queue_manager,
             tts_engine=tts_engine,
+            selected_voice_id=resolved_voice_id,
             proxy_url=proxy_url,
             enable_comments=enable_comments,
             enable_gifts=enable_gifts,
@@ -220,11 +277,88 @@ class SessionManager:
             last_active=now,
         )
 
+        # Bind queue_manager enqueue methods to inject session's selected_voice_id automatically
+        orig_enqueue_comment = queue_manager.enqueue_comment
+        orig_enqueue_gift = queue_manager.enqueue_gift
+
+        async def _bound_enqueue_comment(
+            user_id: str, text: str, voice_id: Optional[str] = None
+        ) -> bool:
+            target_vid = get_voice_profile(voice_id or instance.selected_voice_id).id
+            ok = await orig_enqueue_comment(user_id, text)
+            if ok and queue_manager._items:
+                setattr(queue_manager._items[-1], "voice_id", target_vid)
+            return ok
+
+        async def _bound_enqueue_gift(
+            user_id: str, text: str, voice_id: Optional[str] = None
+        ) -> bool:
+            target_vid = get_voice_profile(voice_id or instance.selected_voice_id).id
+            ok = await orig_enqueue_gift(user_id, text)
+            if ok and queue_manager._items:
+                for it in reversed(queue_manager._items):
+                    if it.is_gift and it.text == text and getattr(it, "voice_id", None) is None:
+                        setattr(it, "voice_id", target_vid)
+                        break
+            return ok
+
+        queue_manager.enqueue_comment = _bound_enqueue_comment  # type: ignore[method-assign]
+        queue_manager.enqueue_gift = _bound_enqueue_gift  # type: ignore[method-assign]
+
         with self._lock:
             self._sessions[session_id] = instance
 
         logger.info("Created session %s for streamer %s", session_id, tiktok_username)
         return instance
+
+    def set_session_voice(self, session_id: str, voice_id: str) -> bool:
+        """Update the selected voice profile ID for an active session.
+
+        Args:
+            session_id: Universally Unique Identifier (UUID) string of the session.
+            voice_id: Target voice profile identifier (e.g., "yuta", "hana", "joker", "anchor", "niwat").
+
+        Returns:
+            bool: True if the session exists and was updated, False otherwise.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                return False
+            resolved_profile = get_voice_profile(voice_id)
+            session.selected_voice_id = resolved_profile.id
+            session.touch()
+            return True
+
+    async def enqueue_speech(
+        self,
+        session_id: str,
+        text: str,
+        user_id: str = "anonymous",
+        is_gift: bool = False,
+        voice_id: Optional[str] = None,
+    ) -> bool:
+        """Enqueue a speech job for the specified session carrying its selected_voice_id.
+
+        Args:
+            session_id: Target session Universally Unique Identifier (UUID).
+            text: Speech text to synthesize.
+            user_id: Viewer or sender identifier.
+            is_gift: Whether this is a priority gift announcement.
+            voice_id: Optional voice ID override; defaults to session.selected_voice_id.
+
+        Returns:
+            bool: True if enqueued, False if session does not exist or queue rejected item.
+        """
+        session = self.get_session(session_id)
+        if session is None:
+            return False
+        return await session.enqueue_speech(
+            text=text,
+            user_id=user_id,
+            is_gift=is_gift,
+            voice_id=voice_id or session.selected_voice_id,
+        )
 
     def get_session(self, session_id: str) -> Optional[SessionInstance]:
         """Retrieve an active session instance by its session identifier.

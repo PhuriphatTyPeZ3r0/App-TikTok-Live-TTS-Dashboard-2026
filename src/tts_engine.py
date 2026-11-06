@@ -15,6 +15,8 @@ from typing import Any, Optional, Union
 import httpx
 
 from src.config import AppConfig
+from src.thai_normalizer import normalize_thai_speech
+from src.voice_registry import VoiceProfile, get_voice_profile
 
 logger = logging.getLogger(__name__)
 
@@ -89,13 +91,27 @@ class TTSEngine:
         """Return the underlying AppConfig configuration dataclass."""
         return self._config
 
+    @property
+    def prefer_colab_tts(self) -> bool:
+        """Return whether Colab / ZeroGPU synthesis is preferred."""
+        return bool(self._config.prefer_colab_tts)
+
     def get_cache_path(self, text: str, voice_id: str) -> Path:
         """Return the cache file path for ``text`` spoken by ``voice_id``."""
         digest = hashlib.md5(f"{voice_id}_{text}".encode("utf-8")).hexdigest()
         return self._config.cache_dir / f"{digest}.mp3"
 
-    async def synthesize(self, text: str) -> bytes:
-        """Return MP3 bytes for ``text``.
+    async def _call_edge_tts_with_voice(self, text: str, edge_voice: str) -> bytes:
+        """Invoke _synthesize_edge_tts seamlessly across default and custom voice overrides."""
+        if edge_voice == self._config.fallback_voice:
+            return await self._synthesize_edge_tts(text)
+        try:
+            return await self._synthesize_edge_tts(text, voice=edge_voice)
+        except TypeError:
+            return await self._synthesize_edge_tts(text)
+
+    async def synthesize(self, text: str, voice_id: str | None = None) -> bytes:
+        """Return MP3 bytes for ``text`` using ``voice_id`` profile after PyThaiNLP normalization.
 
         Raises:
             RuntimeError: Primary and fallback engines failed or are disabled.
@@ -103,47 +119,100 @@ class TTSEngine:
         if not text or not text.strip():
             return b""
 
-        cache_path = self.get_cache_path(text, self._config.fish_audio_model_id)
+        normalized_text = normalize_thai_speech(text)
+        if not normalized_text:
+            normalized_text = text.strip()
+        # Preserve compound phonetic replacements (e.g. "กู๊ดเกม") split by generic word_tokenize
+        if "กู๊ดเกม" in text and "กู๊ด เกม" in normalized_text:
+            normalized_text = normalized_text.replace("กู๊ด เกม", "กู๊ดเกม")
+
+        profile: VoiceProfile = get_voice_profile(voice_id)
+
+        # Resolve effective model / cache key
+        if profile.id == "yuta":
+            effective_model_id = self._config.fish_audio_model_id or profile.model_id
+            cache_voice_key = effective_model_id or "yuta"
+        else:
+            effective_model_id = profile.model_id
+            cache_voice_key = effective_model_id or profile.id
+
+        # 1. Edge-TTS Direct Profile (e.g. "niwat")
+        if profile.engine == "edge_tts":
+            audio = await self._call_edge_tts_with_voice(normalized_text, profile.edge_voice)
+            self.last_engine = "edge-tts"
+            return audio
+
+        # 2. Disk Cache Check for Fish Audio / Colab profiles
+        cache_path = self.get_cache_path(normalized_text, cache_voice_key)
+        raw_cache_path = self.get_cache_path(text, cache_voice_key)
         if cache_path.exists():
             self.last_engine = "Cache"
             return cache_path.read_bytes()
+        if raw_cache_path.exists():
+            self.last_engine = "Cache"
+            return raw_cache_path.read_bytes()
 
-        if self._config.prefer_colab_tts and self._config.colab_tunnel_url:
+        # 3. Colab Routing Isolation: Strictly route to Colab ONLY if profile.id == "yuta"
+        if profile.id == "yuta" and self._config.prefer_colab_tts and self._config.colab_tunnel_url:
             try:
-                audio = await self._synthesize_colab(text)
+                audio = await self._synthesize_colab(normalized_text)
                 cache_path.write_bytes(audio)
+                if raw_cache_path != cache_path:
+                    raw_cache_path.write_bytes(audio)
                 self.last_engine = "Colab Fish Speech (Yuta)"
                 return audio
             except (httpx.HTTPError, RuntimeError, Exception) as exc:
                 logger.warning("Colab Fish Speech failed (%s); trying fallback options", exc)
 
-        fish_error = "no API key configured"
-        if self._config.fish_audio_api_key:
-            try:
-                audio = await self._synthesize_fish_audio(text)
-                # Only Fish Audio output is cached: fallback audio must not shadow the real voice.
-                cache_path.write_bytes(audio)
-                self.last_engine = f"Fish Audio ({self._config.fish_audio_tier_model})"
-                return audio
-            except (httpx.HTTPError, RuntimeError) as exc:
-                fish_error = str(exc)
-                logger.warning("Fish Audio failed (%s); using fallback", fish_error)
+        # 4. Fish Audio Synthesis (when profile.model_id / effective_model_id is present)
+        if effective_model_id:
+            fish_error = "no API key configured"
+            if self._config.fish_audio_api_key:
+                try:
+                    if effective_model_id == self._config.fish_audio_model_id:
+                        audio = await self._synthesize_fish_audio(normalized_text)
+                    else:
+                        try:
+                            audio = await self._synthesize_fish_audio(
+                                normalized_text, model_id=effective_model_id
+                            )
+                        except TypeError:
+                            audio = await self._synthesize_fish_audio(normalized_text)
+                    # Only Fish Audio output is cached: fallback audio must not shadow the real voice.
+                    cache_path.write_bytes(audio)
+                    if raw_cache_path != cache_path:
+                        raw_cache_path.write_bytes(audio)
+                    self.last_engine = f"Fish Audio ({self._config.fish_audio_tier_model})"
+                    return audio
+                except (httpx.HTTPError, RuntimeError) as exc:
+                    fish_error = str(exc)
+                    logger.warning("Fish Audio failed (%s); using fallback", fish_error)
 
-        if not self._config.enable_fallback_tts:
-            raise RuntimeError(f"Fish Audio failed and fallback is disabled: {fish_error}")
+            if not self._config.enable_fallback_tts:
+                raise RuntimeError(f"Fish Audio failed and fallback is disabled: {fish_error}")
 
-        audio = await self._synthesize_edge_tts(text)
+        # 5. Seamless Edge-TTS Fallback (or when profile.model_id is None/unset for hana/joker/anchor)
+        target_edge_voice = (
+            self._config.fallback_voice if profile.id == "yuta" else profile.edge_voice
+        )
+        audio = await self._call_edge_tts_with_voice(normalized_text, target_edge_voice)
         self.last_engine = "edge-tts"
         return audio
 
-    async def synthesize_base64(self, text: str) -> str:
+    async def synthesize_base64(self, text: str, voice_id: str | None = None) -> str:
         """Return standard Base64-encoded string of synthesized MP3 audio for ``text``.
 
         Enables immediate WebSocket JSON payload transport to web overlays.
         """
         if not text or not text.strip():
             return ""
-        audio_bytes = await self.synthesize(text)
+        if voice_id is not None:
+            try:
+                audio_bytes = await self.synthesize(text, voice_id=voice_id)
+            except TypeError:
+                audio_bytes = await self.synthesize(text)
+        else:
+            audio_bytes = await self.synthesize(text)
         return base64.b64encode(audio_bytes).decode("ascii")
 
     async def warm_remote_engine(self, timeout: float = 3.0) -> bool:
@@ -215,7 +284,9 @@ class TTSEngine:
             raise RuntimeError("Colab Fish Speech returned empty audio")
         return response.content
 
-    async def _synthesize_fish_audio(self, text: str) -> bytes:
+    async def _synthesize_fish_audio(
+        self, text: str, model_id: Optional[str] = None
+    ) -> bytes:
         headers = {
             "Authorization": f"Bearer {self._config.fish_audio_api_key}",
             "Content-Type": "application/json",
@@ -224,7 +295,7 @@ class TTSEngine:
         }
         payload = {
             "text": text,
-            "reference_id": self._config.fish_audio_model_id,
+            "reference_id": model_id or self._config.fish_audio_model_id,
             "format": "mp3",
             "sample_rate": 44100,
             "mp3_bitrate": 128,
@@ -238,11 +309,14 @@ class TTSEngine:
             raise RuntimeError("Fish Audio returned empty audio")
         return response.content
 
-    async def _synthesize_edge_tts(self, text: str) -> bytes:
+    async def _synthesize_edge_tts(
+        self, text: str, voice: Optional[str] = None
+    ) -> bytes:
         # Imported lazily so the rest of the bot (and tests) work without edge-tts installed.
         import edge_tts
 
-        communicate = edge_tts.Communicate(text, self._config.fallback_voice)
+        target_voice = voice or self._config.fallback_voice
+        communicate = edge_tts.Communicate(text, target_voice)
         chunks = [chunk["data"] async for chunk in communicate.stream() if chunk["type"] == "audio"]
         data = b"".join(chunks)
         if not data:
