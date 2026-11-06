@@ -17,8 +17,8 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-roboto)", "var(--font-kanit)", "sans-serif"],
-        mono: ["var(--font-roboto-mono)", "monospace"],
+        sans: ["var(--font-prompt)", "var(--font-roboto)", "var(--font-kanit)", "sans-serif"],
+        mono: ["var(--font-jetbrains-mono)", "var(--font-roboto-mono)", "monospace"],
       },
       colors: {
         // Red Broadcast Design System Tokens
