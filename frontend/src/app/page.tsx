@@ -76,6 +76,24 @@ function TikFinityDashboardContent() {
   const currentPlayIdRef = useRef<number>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Suppress harmless third-party browser extension message-channel unhandled rejections
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const msg = event?.reason?.message || String(event?.reason || "");
+      if (
+        msg.includes("message channel closed before a response was received") ||
+        msg.includes("A listener indicated an asynchronous response")
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    return () => {
+      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
