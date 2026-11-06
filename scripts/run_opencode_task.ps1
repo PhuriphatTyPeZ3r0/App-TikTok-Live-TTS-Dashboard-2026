@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Prompt,
 
-    [string]$Model = "omniroute/antigravity/claude-sonnet-5-5-high",
+    [string]$Model = "omniroute/opencode-coding",
 
     [string]$File = "",
 
@@ -40,17 +40,25 @@ if ($DryRun) {
 
 Push-Location $WorkDir
 try {
+    $guardedPrompt = "$Prompt`n`nIMPORTANT TOOL RULE: Always invoke at most ONE tool call per response turn (never emit parallel tool_use blocks in the same turn)."
     $argsList = @("run", "--auto", "-m", $Model)
     if ($File -and (Test-Path $File)) {
         $argsList += @("-f", $File)
     }
-    $argsList += $Prompt
+    $argsList += $guardedPrompt
 
+    & opencode service start *> $null
     Write-Host ">>> Dispatching task to OpenCode ($Model)..." -ForegroundColor Cyan
     # Pipe empty string to close stdin immediately so non-TTY subprocesses do not block waiting on EOF
     "" | & opencode @argsList
     if ($LASTEXITCODE -ne 0) {
-        throw "opencode exited with code $LASTEXITCODE"
+        Write-Host ">>> Retrying after restarting OpenCode background service..." -ForegroundColor Yellow
+        & opencode service restart *> $null
+        Start-Sleep -Seconds 2
+        "" | & opencode @argsList
+        if ($LASTEXITCODE -ne 0) {
+            throw "opencode exited with code $LASTEXITCODE"
+        }
     }
 } finally {
     Pop-Location

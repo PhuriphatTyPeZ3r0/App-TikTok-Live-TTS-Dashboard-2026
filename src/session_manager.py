@@ -23,7 +23,7 @@ try:
 except ImportError:
     from src.queue_manager import SpeechItem as TTSItem, TextQueueManager as TTSQueueManager  # type: ignore[attr-defined]
 from src.tts_engine import TTSEngine
-from src.voice_registry import get_voice_profile
+from src.voice_registry import get_voice_profile, normalize_voice_tuning
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ class SessionInstance:
     queue_manager: TTSQueueManager
     tts_engine: Optional[TTSEngine] = None
     selected_voice_id: str = "yuta"
+    voice_tuning: Dict[str, Dict[str, Union[float, int]]] = field(default_factory=dict)
     proxy_url: Optional[str] = None
     enable_comments: bool = True
     enable_gifts: bool = True
@@ -329,6 +330,91 @@ class SessionManager:
             session.selected_voice_id = resolved_profile.id
             session.touch()
             return True
+
+    def get_voice_tuning(
+        self, session_id: str, voice_id: Optional[str] = None
+    ) -> Dict[str, Union[float, int]]:
+        """Retrieve the clamped acoustic tuning dictionary for a session and voice profile.
+
+        Args:
+            session_id: Target session Universally Unique Identifier (UUID).
+            voice_id: Optional voice profile ID; defaults to session.selected_voice_id.
+
+        Returns:
+            Dict[str, Union[float, int]]: Dictionary with 'speed', 'pitch', and 'volume'.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None:
+                return {"speed": 1.0, "pitch": 0, "volume": 100}
+            resolved_profile = get_voice_profile(voice_id or session.selected_voice_id)
+            saved = session.voice_tuning.get(resolved_profile.id)
+            if not saved:
+                return {
+                    "speed": resolved_profile.default_speed,
+                    "pitch": resolved_profile.default_pitch,
+                    "volume": resolved_profile.default_volume,
+                }
+            tuning = normalize_voice_tuning(
+                speed=saved.get("speed", resolved_profile.default_speed),
+                pitch=saved.get("pitch", resolved_profile.default_pitch),
+                volume=saved.get("volume", resolved_profile.default_volume),
+            )
+            return {
+                "speed": tuning.speed,
+                "pitch": tuning.pitch,
+                "volume": tuning.volume,
+            }
+
+    def set_voice_tuning(
+        self,
+        session_id: str,
+        voice_id: str,
+        speed: Any = None,
+        pitch: Any = None,
+        volume: Any = None,
+    ) -> Dict[str, Union[float, int]]:
+        """Update and clamp acoustic tuning parameters for a voice profile in an active session.
+
+        Args:
+            session_id: Target session Universally Unique Identifier (UUID).
+            voice_id: Target voice profile identifier.
+            speed: Optional speaking speed multiplier in [0.5, 2.0].
+            pitch: Optional pitch offset in Hertz (Hz) in [-50, 50].
+            volume: Optional volume percentage in [0, 200].
+
+        Returns:
+            Dict[str, Union[float, int]]: Normalized dictionary with 'speed', 'pitch', and 'volume'.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            resolved_profile = get_voice_profile(voice_id)
+            if session is None:
+                t = normalize_voice_tuning(
+                    speed=resolved_profile.default_speed if speed is None else speed,
+                    pitch=resolved_profile.default_pitch if pitch is None else pitch,
+                    volume=resolved_profile.default_volume if volume is None else volume,
+                )
+                return {"speed": t.speed, "pitch": t.pitch, "volume": t.volume}
+
+            existing = session.voice_tuning.get(resolved_profile.id, {})
+            merged_speed = existing.get("speed", resolved_profile.default_speed) if speed is None else speed
+            merged_pitch = existing.get("pitch", resolved_profile.default_pitch) if pitch is None else pitch
+            merged_volume = existing.get("volume", resolved_profile.default_volume) if volume is None else volume
+
+            t = normalize_voice_tuning(
+                speed=merged_speed,
+                pitch=merged_pitch,
+                volume=merged_volume,
+            )
+            tuning_dict: Dict[str, Union[float, int]] = {
+                "speed": t.speed,
+                "pitch": t.pitch,
+                "volume": t.volume,
+            }
+            session.voice_tuning[resolved_profile.id] = tuning_dict
+            session.touch()
+            return dict(tuning_dict)
 
     async def enqueue_speech(
         self,

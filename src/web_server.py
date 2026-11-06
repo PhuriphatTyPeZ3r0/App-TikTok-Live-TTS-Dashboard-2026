@@ -654,12 +654,14 @@ async def get_session_status(
         )
 
     session.touch()
+    active_voice_id = getattr(session, "selected_voice_id", "yuta")
     return {
         "session_id": session.session_id,
         "tiktok_username": session.tiktok_username,
         "enable_comments": session.enable_comments,
         "enable_gifts": session.enable_gifts,
-        "selected_voice_id": getattr(session, "selected_voice_id", "yuta"),
+        "selected_voice_id": active_voice_id,
+        "voice_tuning": session_manager.get_voice_tuning(session.session_id, active_voice_id),
         "queue_size": session.queue_manager.get_queue_size(),
         "connected_overlays_count": len(session.connected_overlays),
         "connected_dashboards_count": len(session.connected_dashboards),
@@ -756,6 +758,23 @@ async def set_session_voice_endpoint(
     profile = get_voice_profile(requested_voice_id)
     session_manager.set_session_voice(session.session_id, profile.id)
     session.selected_voice_id = profile.id
+
+    nested_tuning = body_data.get("tuning") if isinstance(body_data.get("tuning"), dict) else {}
+    req_speed = body_data.get("speed") if "speed" in body_data else nested_tuning.get("speed")
+    req_pitch = body_data.get("pitch") if "pitch" in body_data else nested_tuning.get("pitch")
+    req_volume = body_data.get("volume") if "volume" in body_data else nested_tuning.get("volume")
+
+    if req_speed is not None or req_pitch is not None or req_volume is not None:
+        tuning_dict = session_manager.set_voice_tuning(
+            session.session_id,
+            profile.id,
+            speed=req_speed,
+            pitch=req_pitch,
+            volume=req_volume,
+        )
+    else:
+        tuning_dict = session_manager.get_voice_tuning(session.session_id, profile.id)
+
     session.touch()
 
     voice_msg = {
@@ -763,6 +782,7 @@ async def set_session_voice_endpoint(
         "data": {
             "voice_id": profile.id,
             "voice_name": profile.name,
+            "tuning": tuning_dict,
         },
     }
     await broadcast_to_overlays(session.session_id, voice_msg)
@@ -772,6 +792,7 @@ async def set_session_voice_endpoint(
         "status": "ok",
         "voice_id": profile.id,
         "voice_name": profile.name,
+        "tuning": tuning_dict,
     }
 
 
@@ -904,6 +925,21 @@ async def test_voice_synthesis(
     requested_voice_id = body_data.get("voice_id")
     target_voice_id = get_voice_profile(requested_voice_id or getattr(session, "selected_voice_id", "yuta")).id
 
+    nested_tuning = body_data.get("tuning") if isinstance(body_data.get("tuning"), dict) else {}
+    req_speed = body_data.get("speed") if "speed" in body_data else nested_tuning.get("speed")
+    req_pitch = body_data.get("pitch") if "pitch" in body_data else nested_tuning.get("pitch")
+    req_volume = body_data.get("volume") if "volume" in body_data else nested_tuning.get("volume")
+    if req_speed is not None or req_pitch is not None or req_volume is not None:
+        tuning_dict = session_manager.set_voice_tuning(
+            session.session_id,
+            target_voice_id,
+            speed=req_speed,
+            pitch=req_pitch,
+            volume=req_volume,
+        )
+    else:
+        tuning_dict = session_manager.get_voice_tuning(session.session_id, target_voice_id)
+
     test_item = TTSItem(
         text=custom_text,
         user_id="system",
@@ -916,10 +952,31 @@ async def test_voice_synthesis(
     b64_audio = ""
     if session.tts_engine is not None:
         try:
+            is_default_tuning = (
+                tuning_dict.get("speed", 1.0) == 1.0
+                and tuning_dict.get("pitch", 0) == 0
+                and tuning_dict.get("volume", 100) == 100
+            )
             try:
-                b64_audio = await session.tts_engine.synthesize_base64(custom_text, voice_id=target_voice_id)
+                if is_default_tuning:
+                    b64_audio = await session.tts_engine.synthesize_base64(
+                        custom_text, voice_id=target_voice_id
+                    )
+                else:
+                    b64_audio = await session.tts_engine.synthesize_base64(
+                        custom_text,
+                        voice_id=target_voice_id,
+                        speed=float(tuning_dict["speed"]),
+                        pitch=int(tuning_dict["pitch"]),
+                        volume=int(tuning_dict["volume"]),
+                    )
             except TypeError:
-                b64_audio = await session.tts_engine.synthesize_base64(custom_text)
+                try:
+                    b64_audio = await session.tts_engine.synthesize_base64(
+                        custom_text, voice_id=target_voice_id
+                    )
+                except TypeError:
+                    b64_audio = await session.tts_engine.synthesize_base64(custom_text)
         except Exception as exc:
             logger.warning("TTS synthesis failed in test_voice: %s", exc)
 
@@ -935,6 +992,7 @@ async def test_voice_synthesis(
         "gift_count": body_data.get("gift_count", 0),
         "engine": engine_name,
         "voice_id": target_voice_id,
+        "tuning": tuning_dict,
     }
     await broadcast_to_overlays(session.session_id, payload)
     await broadcast_to_dashboards(session.session_id, payload)
@@ -944,6 +1002,7 @@ async def test_voice_synthesis(
         "session_id": session.session_id,
         "text": custom_text,
         "voice_id": target_voice_id,
+        "tuning": tuning_dict,
         "engine": getattr(session.tts_engine, "last_engine", engine_name) if session.tts_engine else engine_name,
         "audio_base64": b64_audio,
     }
@@ -1101,16 +1160,37 @@ async def websocket_dashboard_endpoint(websocket: WebSocket, session_id: str) ->
             elif action == "toggle_gifts":
                 session.enable_gifts = bool(data.get("enabled", True))
             elif action == "set_voice":
-                nested = data.get("data")
-                raw_voice_id = data.get("voice_id") or (nested.get("voice_id") if isinstance(nested, dict) else None)
+                nested = data.get("data") if isinstance(data.get("data"), dict) else {}
+                raw_voice_id = data.get("voice_id") or nested.get("voice_id")
                 profile = get_voice_profile(raw_voice_id)
                 session_manager.set_session_voice(session.session_id, profile.id)
                 session.selected_voice_id = profile.id
+
+                nested_tuning = (
+                    data.get("tuning")
+                    if isinstance(data.get("tuning"), dict)
+                    else (nested.get("tuning") if isinstance(nested.get("tuning"), dict) else {})
+                )
+                ws_speed = data.get("speed") if "speed" in data else (nested.get("speed") if "speed" in nested else nested_tuning.get("speed"))
+                ws_pitch = data.get("pitch") if "pitch" in data else (nested.get("pitch") if "pitch" in nested else nested_tuning.get("pitch"))
+                ws_volume = data.get("volume") if "volume" in data else (nested.get("volume") if "volume" in nested else nested_tuning.get("volume"))
+                if ws_speed is not None or ws_pitch is not None or ws_volume is not None:
+                    tuning_dict = session_manager.set_voice_tuning(
+                        session.session_id,
+                        profile.id,
+                        speed=ws_speed,
+                        pitch=ws_pitch,
+                        volume=ws_volume,
+                    )
+                else:
+                    tuning_dict = session_manager.get_voice_tuning(session.session_id, profile.id)
+
                 voice_msg = {
                     "type": "VOICE_CHANGED",
                     "data": {
                         "voice_id": profile.id,
                         "voice_name": profile.name,
+                        "tuning": tuning_dict,
                     },
                 }
                 await broadcast_to_overlays(session.session_id, voice_msg)

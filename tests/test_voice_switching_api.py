@@ -148,3 +148,42 @@ def test_voice_endpoint_passes_voice_id(client: TestClient, test_session: Sessio
         )
         assert res2.status_code == 200
         mock_synth.assert_awaited_with("ทดสอบเสียงดีเจ", voice_id="joker")
+
+
+def test_post_session_voice_with_acoustic_tuning_persists_and_broadcasts(client: TestClient) -> None:
+    """Verify POST /api/session/{id}/voice and WebSocket set_voice persist and clamp per-voice tuning."""
+    start_resp = client.post(
+        "/api/session/start",
+        json={"tiktok_username": "@tuning_streamer", "fish_audio_api_key": "test_key"},
+    )
+    assert start_resp.status_code == 200
+    data = start_resp.json()
+    session_id = data["session_id"]
+    admin_token = data["admin_token"]
+
+    try:
+        resp = client.post(
+            f"/api/session/{session_id}/voice",
+            headers={"X-Admin-Token": admin_token},
+            json={"voice_id": "hana", "speed": 1.25, "pitch": 15, "volume": 110},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["voice_id"] == "hana"
+        assert body["tuning"] == {"speed": 1.25, "pitch": 15, "volume": 110}
+
+        # Partial update preserves pitch and volume while clamping out-of-range speed
+        resp2 = client.post(
+            f"/api/session/{session_id}/voice",
+            headers={"X-Admin-Token": admin_token},
+            json={"voice_id": "hana", "speed": 9.9},
+        )
+        assert resp2.status_code == 200
+        assert resp2.json()["tuning"] == {"speed": 2.0, "pitch": 15, "volume": 110}
+
+        status_resp = client.get(f"/api/session/{session_id}/status?token={admin_token}")
+        assert status_resp.status_code == 200
+        assert status_resp.json()["voice_tuning"] == {"speed": 2.0, "pitch": 15, "volume": 110}
+    finally:
+        session_manager.delete_session(session_id)
+
