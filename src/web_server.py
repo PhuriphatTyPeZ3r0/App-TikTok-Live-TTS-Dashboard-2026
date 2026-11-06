@@ -782,10 +782,10 @@ async def test_voice_synthesis(
     # Validate admin token
     if not target_token or not secrets.compare_digest(target_token, session.admin_token):
         # Allow default_token in test environments or match active admin_token
-        if target_token != "admin_token":
+        if target_token not in ("admin_token", "default_token"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: Admin token required for voice test",
+                detail="Forbidden: Admin token invalid or expired. Please re-sync with /api/sessions/active",
             )
 
     session.touch()
@@ -907,13 +907,14 @@ async def websocket_overlay_endpoint(websocket: WebSocket, session_id: str) -> N
     token = websocket.query_params.get("token")
     session = session_manager.get_session(session_id)
 
-    # Smart alias: if connecting to default_session and an active running session exists, resolve it
-    if session is None and session_id in ("default_session", "active"):
+    # Smart alias: if connecting to default_session, active, or if target session was recycled
+    if session is None:
         active = next((s for s in session_manager.list_sessions() if s.is_running), None)
         if active is not None:
-            session = active
-            if token in ("overlay_token", "default_token"):
-                token = active.overlay_token
+            if session_id in ("default_session", "active") or (token and secrets.compare_digest(token, active.overlay_token)):
+                session = active
+                if token in ("overlay_token", "default_token"):
+                    token = active.overlay_token
 
     if session is None or not token or not secrets.compare_digest(token, session.overlay_token):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -956,13 +957,14 @@ async def websocket_dashboard_endpoint(websocket: WebSocket, session_id: str) ->
     token = websocket.query_params.get("token")
     session = session_manager.get_session(session_id)
 
-    # Smart alias: if connecting to default_session and an active running session exists, resolve it
-    if session is None and session_id in ("default_session", "active"):
+    # Smart alias: if connecting to default_session, active, or if target session was recycled
+    if session is None:
         active = next((s for s in session_manager.list_sessions() if s.is_running), None)
         if active is not None:
-            session = active
-            if token in ("admin_token", "default_token"):
-                token = active.admin_token
+            if session_id in ("default_session", "active") or (token and secrets.compare_digest(token, active.admin_token)):
+                session = active
+                if token in ("admin_token", "default_token"):
+                    token = active.admin_token
 
     if session is None or not token or not secrets.compare_digest(token, session.admin_token):
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)

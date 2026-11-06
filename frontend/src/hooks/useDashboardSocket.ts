@@ -89,6 +89,7 @@ export function useDashboardSocket({
   wsUrl,
   enabled = true,
   onEvent,
+  onUnauthorized,
 }: UseDashboardSocketOptions): UseDashboardSocketReturn {
   // Connection states
   const [isConnected, setIsConnected] = useState<boolean>(false);
@@ -110,10 +111,15 @@ export function useDashboardSocket({
   const attemptRef = useRef<number>(0);
   const isMountedRef = useRef<boolean>(true);
   const onEventRef = useRef(onEvent);
+  const onUnauthorizedRef = useRef(onUnauthorized);
 
   useEffect(() => {
     onEventRef.current = onEvent;
   }, [onEvent]);
+
+  useEffect(() => {
+    onUnauthorizedRef.current = onUnauthorized;
+  }, [onUnauthorized]);
 
   /**
    * Safely dispatch a JavaScript Object Notation (JSON) payload over the active socket.
@@ -350,11 +356,21 @@ export function useDashboardSocket({
         }
       };
 
-      ws.onclose = () => {
+      ws.onclose = (event: CloseEvent) => {
         clearHeartbeatInterval();
         if (!isMountedRef.current) return;
 
         setIsConnected(false);
+
+        // Policy Violation (1008): Stale or invalid session/admin token
+        if (event.code === 1008) {
+          console.warn("[useDashboardSocket] WS closed with Policy Violation (1008). Requesting active session re-sync.");
+          setError("Session credentials expired. Re-authenticating with active session...");
+          setIsReconnecting(false);
+          onUnauthorizedRef.current?.();
+          return;
+        }
+
         setIsReconnecting(true);
 
         // Exponential backoff formula: Math.min(1000 * Math.pow(2, attempt), 16000)
@@ -438,6 +454,12 @@ export function useDashboardSocket({
           },
           body: JSON.stringify(payload),
         });
+
+        if (res.status === 403 || res.status === 404) {
+          console.warn(`[useDashboardSocket] testVoice returned HTTP ${res.status}. Requesting active session re-sync.`);
+          onUnauthorizedRef.current?.();
+          return false;
+        }
 
         return res.ok;
       } catch (err) {

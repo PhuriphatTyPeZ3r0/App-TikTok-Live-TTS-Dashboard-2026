@@ -112,44 +112,125 @@ function TikFinityDashboardContent() {
   }, [settings.userCooldownSeconds]);
 
   // Auto-discover active session from backend or browser sessionStorage if none in URL
-  useEffect(() => {
-    async function autoDiscoverSession() {
-      if (sessionId && adminToken) return;
+  const refreshActiveSession = useCallback(async (force = false) => {
+    try {
+      const cleanUrl = backendUrl.replace(/\/+$/, "");
+      const res = await fetch(`${cleanUrl}/api/sessions/active`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.has_active_session && data.session_id) {
+          if (force || !sessionId || sessionId !== data.session_id || !adminToken || adminToken !== data.admin_token) {
+            console.info(`[TikFinity Dashboard] Synchronizing with active backend session: ${data.session_id}`);
+            setSessionId(data.session_id);
+            setAdminToken(data.admin_token);
+            setOverlayToken(data.overlay_token || "");
+            if (data.tiktok_username) setUsername(data.tiktok_username);
 
+            try {
+              sessionStorage.setItem(
+                "tiktok_live_tts_session",
+                JSON.stringify({
+                  sessionId: data.session_id,
+                  adminToken: data.admin_token,
+                  overlayToken: data.overlay_token || "",
+                  username: data.tiktok_username || "phuriphat_live",
+                })
+              );
+            } catch (e) {}
+
+            if (typeof window !== "undefined") {
+              const url = new URL(window.location.href);
+              url.searchParams.set("sessionId", data.session_id);
+              url.searchParams.set("token", data.admin_token);
+              if (data.overlay_token) url.searchParams.set("overlayToken", data.overlay_token);
+              if (data.tiktok_username) url.searchParams.set("username", data.tiktok_username);
+              window.history.replaceState({}, "", url.toString());
+            }
+          }
+          return data;
+        }
+      }
+    } catch (err) {
+      console.warn("[TikFinity Dashboard] Failed auto-discovering active session:", err);
+    }
+    return null;
+  }, [backendUrl, sessionId, adminToken]);
+
+  const handleUnauthorized = useCallback(() => {
+    console.warn("[TikFinity Dashboard] Unauthorized or session expired. Clearing stale cache and re-syncing...");
+    try {
+      sessionStorage.removeItem("tiktok_live_tts_session");
+    } catch (e) {}
+    refreshActiveSession(true);
+  }, [refreshActiveSession]);
+
+  // Synchronize and validate active session on mount
+  useEffect(() => {
+    // 1. Try sessionStorage first as instant cache
+    let cachedSessionId = sessionId;
+    let cachedToken = adminToken;
+    if (!cachedSessionId || !cachedToken) {
       try {
         const saved = sessionStorage.getItem("tiktok_live_tts_session");
         if (saved) {
           const parsed = JSON.parse(saved);
           if (parsed.sessionId && parsed.adminToken) {
+            cachedSessionId = parsed.sessionId;
+            cachedToken = parsed.adminToken;
             setSessionId(parsed.sessionId);
             setAdminToken(parsed.adminToken);
             setOverlayToken(parsed.overlayToken || "");
-            setUsername(parsed.username || "phuriphat_live");
-            return;
+            if (parsed.username) setUsername(parsed.username);
           }
         }
-      } catch (e) {
-        // Ignore sessionStorage parse errors
-      }
+      } catch (e) {}
+    }
 
+    // 2. Validate against /api/sessions/active to ensure backend session has not recycled
+    async function validateActiveSession() {
       try {
-        const res = await fetch(`${backendUrl.replace(/\/+$/, "")}/api/sessions/active`);
+        const cleanUrl = backendUrl.replace(/\/+$/, "");
+        const res = await fetch(`${cleanUrl}/api/sessions/active`);
         if (res.ok) {
           const data = await res.json();
-          if (data && data.session_id) {
-            setSessionId(data.session_id);
-            setAdminToken(data.admin_token);
-            setOverlayToken(data.overlay_token || "");
-            if (data.tiktok_username) setUsername(data.tiktok_username);
+          if (data && data.has_active_session && data.session_id) {
+            if (!cachedSessionId || cachedSessionId !== data.session_id || cachedToken !== data.admin_token) {
+              console.info(`[TikFinity Dashboard] Synchronizing with active backend session: ${data.session_id}`);
+              setSessionId(data.session_id);
+              setAdminToken(data.admin_token);
+              setOverlayToken(data.overlay_token || "");
+              if (data.tiktok_username) setUsername(data.tiktok_username);
+
+              try {
+                sessionStorage.setItem(
+                  "tiktok_live_tts_session",
+                  JSON.stringify({
+                    sessionId: data.session_id,
+                    adminToken: data.admin_token,
+                    overlayToken: data.overlay_token || "",
+                    username: data.tiktok_username || "phuriphat_live",
+                  })
+                );
+              } catch (e) {}
+
+              if (typeof window !== "undefined") {
+                const url = new URL(window.location.href);
+                url.searchParams.set("sessionId", data.session_id);
+                url.searchParams.set("token", data.admin_token);
+                if (data.overlay_token) url.searchParams.set("overlayToken", data.overlay_token);
+                if (data.tiktok_username) url.searchParams.set("username", data.tiktok_username);
+                window.history.replaceState({}, "", url.toString());
+              }
+            }
           }
         }
       } catch (err) {
-        // Fallback gracefully
+        console.warn("[TikFinity Dashboard] Active session probe error:", err);
       }
     }
 
-    autoDiscoverSession();
-  }, [sessionId, adminToken, backendUrl]);
+    validateActiveSession();
+  }, [backendUrl]);
 
   // Inbound WebSocket Event Handler with Anti-Spam Normalization & Priority Queue
   const handleSocketEvent = useCallback((event: DashboardEvent) => {
@@ -297,6 +378,7 @@ function TikFinityDashboardContent() {
     backendUrl,
     enabled: Boolean(sessionId && adminToken),
     onEvent: handleSocketEvent,
+    onUnauthorized: handleUnauthorized,
   });
 
   // Playback & Audio Routing Engine
@@ -348,6 +430,11 @@ function TikFinityDashboardContent() {
 
         // Discard result if skipped or superseded while fetch was inflight
         if (isStale()) return;
+
+        if (res.status === 403 || res.status === 404) {
+          console.warn(`[TikFinity Dashboard] Speech synthesis HTTP ${res.status}. Requesting active session re-sync.`);
+          handleUnauthorized();
+        }
 
         if (res.ok) {
           const data = await res.json();
@@ -500,13 +587,17 @@ function TikFinityDashboardContent() {
     setIsTestingVoice(true);
     try {
       const sampleText = "ทดสอบระบบเสียงสังเคราะห์ ติ๊กต็อกไลฟ์สำเร็จ";
-      await testVoice(sampleText);
+      const success = await testVoice(sampleText);
+      if (!success) {
+        handleUnauthorized();
+      }
     } catch (err) {
       console.error("[TikFinity Dashboard] Voice test failed:", err);
+      handleUnauthorized();
     } finally {
       setIsTestingVoice(false);
     }
-  }, [testVoice]);
+  }, [testVoice, handleUnauthorized]);
 
   // Start or Connect to TikTok Room
   const handleStartRoomSession = async (e: React.FormEvent) => {

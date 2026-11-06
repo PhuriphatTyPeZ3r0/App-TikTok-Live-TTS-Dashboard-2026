@@ -92,6 +92,8 @@ export interface UseDashboardSocketOptions {
   enabled?: boolean;
   /** Optional callback invoked on every inbound WebSocket event envelope. */
   onEvent?: (event: DashboardEvent) => void;
+  /** Optional callback invoked when the backend rejects authentication with 1008 Policy Violation or 403 Forbidden. */
+  onUnauthorized?: () => void;
 }
 
 /**
