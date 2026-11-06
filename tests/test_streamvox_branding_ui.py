@@ -85,3 +85,19 @@ def test_settings_and_page_voice_synchronization():
     assert "/voice" in page_content
     assert "set_voice" in page_content
     assert "voice_id" in page_content
+
+
+def test_voice_selector_includes_acoustic_tuning_sliders_and_reset():
+    """Verify VoiceSelector.tsx and tikfinity.ts support per-voice speed, pitch, volume sliders and reset."""
+    selector_src = VOICE_SELECTOR_FILE.read_text(encoding="utf-8")
+    types_src = TYPES_FILE.read_text(encoding="utf-8")
+
+    assert "VoiceTuningConfig" in types_src
+    assert "DEFAULT_VOICE_TUNING" in types_src
+    assert 'data-testid="voice-tuning-panel"' in selector_src
+    assert 'data-testid="voice-tuning-speed"' in selector_src
+    assert 'data-testid="voice-tuning-pitch"' in selector_src
+    assert 'data-testid="voice-tuning-volume"' in selector_src
+    assert 'data-testid="voice-tuning-reset"' in selector_src
+    assert "restart_alt" in selector_src
+

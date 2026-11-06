@@ -13,7 +13,11 @@
  */
 
 import React, { useEffect, useState } from "react";
-import type { VoiceProfileInfo } from "../types/tikfinity";
+import {
+  DEFAULT_VOICE_TUNING,
+  type VoiceProfileInfo,
+  type VoiceTuningConfig,
+} from "../types/tikfinity";
 
 export const FALLBACK_VOICE_PROFILES: VoiceProfileInfo[] = [
   {
@@ -86,6 +90,12 @@ export interface VoiceSelectorProps {
   onSelectVoice: (voiceId: string) => void;
   /** Callback invoked when the streamer clicks "ฟังตัวอย่างเสียง" on a card. */
   onTestVoice?: (voiceId: string, sampleText: string) => void | Promise<any>;
+  /** Optional per-voice acoustic tuning map or active voice tuning configuration. */
+  voiceTuning?: VoiceTuningConfig;
+  /** Optional map of all per-voice tunings keyed by voice ID. */
+  voiceTunings?: Record<string, VoiceTuningConfig>;
+  /** Callback invoked when the streamer adjusts speed, pitch, or volume for a voice. */
+  onChangeTuning?: (voiceId: string, tuning: VoiceTuningConfig) => void;
   /** Optional base URL of the FastAPI backend for fetching `/api/voices`. */
   backendUrl?: string;
   /** Optional ID of the voice currently playing an audition sample. */
@@ -98,12 +108,16 @@ export function VoiceSelector({
   selectedVoiceId = "yuta",
   onSelectVoice,
   onTestVoice,
+  voiceTuning,
+  voiceTunings,
+  onChangeTuning,
   backendUrl = "",
   testingVoiceId = null,
   className = "",
 }: VoiceSelectorProps): React.JSX.Element {
   const [voices, setVoices] = useState<VoiceProfileInfo[]>(FALLBACK_VOICE_PROFILES);
   const [localTestingId, setLocalTestingId] = useState<string | null>(null);
+  const [localTunings, setLocalTunings] = useState<Record<string, VoiceTuningConfig>>({});
 
   useEffect(() => {
     let isMounted = true;
@@ -148,6 +162,23 @@ export function VoiceSelector({
   };
 
   const activeId = (selectedVoiceId || "yuta").toLowerCase();
+  const activeVoice =
+    voices.find((v) => v.id.toLowerCase() === activeId) || voices[0];
+  const currentTuning: VoiceTuningConfig =
+    voiceTuning ||
+    (voiceTunings && voiceTunings[activeId]) ||
+    localTunings[activeId] ||
+    DEFAULT_VOICE_TUNING;
+
+  const updateActiveTuning = (partial: Partial<VoiceTuningConfig>) => {
+    const next: VoiceTuningConfig = {
+      speed: partial.speed !== undefined ? partial.speed : currentTuning.speed,
+      pitch: partial.pitch !== undefined ? partial.pitch : currentTuning.pitch,
+      volume: partial.volume !== undefined ? partial.volume : currentTuning.volume,
+    };
+    setLocalTunings((prev) => ({ ...prev, [activeId]: next }));
+    onChangeTuning?.(activeId, next);
+  };
 
   return (
     <div className={`flex flex-col gap-3.5 ${className}`} data-testid="voice-selector">
@@ -271,6 +302,124 @@ export function VoiceSelector({
             </div>
           );
         })}
+      </div>
+
+      {/* Per-Voice Acoustic Tuning Panel */}
+      <div
+        data-testid="voice-tuning-panel"
+        className="rounded-xl p-4 bg-[#181b24]/95 border border-[#1e222d] flex flex-col gap-3.5"
+      >
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-rounded text-[#25f4ee] text-lg select-none">
+              tune
+            </span>
+            <div>
+              <h4 className="text-xs font-bold text-white">
+                ปรับแต่งโทนเสียงเฉพาะโปรไฟล์: {activeVoice?.name || activeId}
+              </h4>
+              <p className="text-[11px] text-slate-400">
+                แยกค่าความเร็ว โทนสูง-ต่ำ และความดังอิสระสำหรับแต่ละโปรไฟล์เสียง
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            data-testid="voice-tuning-reset"
+            onClick={() => updateActiveTuning(DEFAULT_VOICE_TUNING)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#12141a] hover:bg-[#fe2c55]/15 text-slate-300 hover:text-[#fe2c55] border border-[#1e222d] hover:border-[#fe2c55]/40 transition-colors"
+          >
+            <span className="material-symbols-rounded text-sm select-none">
+              restart_alt
+            </span>
+            <span>รีเซ็ตค่าเริ่มต้น</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          {/* Speed Slider */}
+          <div className="flex flex-col gap-1.5 bg-[#12141a] p-2.5 rounded-lg border border-white/[0.05]">
+            <div className="flex items-center justify-between text-xs">
+              <span className="inline-flex items-center gap-1 text-slate-300 font-medium">
+                <span className="material-symbols-rounded text-sm text-[#25f4ee] select-none">
+                  speed
+                </span>
+                ความเร็ว (Speed)
+              </span>
+              <span className="font-mono font-bold text-[#25f4ee]">
+                {currentTuning.speed.toFixed(2)}x
+              </span>
+            </div>
+            <input
+              type="range"
+              data-testid="voice-tuning-speed"
+              min="0.5"
+              max="2.0"
+              step="0.05"
+              value={currentTuning.speed}
+              onChange={(e) =>
+                updateActiveTuning({ speed: parseFloat(e.target.value) })
+              }
+              className="w-full accent-[#25f4ee] cursor-pointer"
+            />
+          </div>
+
+          {/* Pitch Slider */}
+          <div className="flex flex-col gap-1.5 bg-[#12141a] p-2.5 rounded-lg border border-white/[0.05]">
+            <div className="flex items-center justify-between text-xs">
+              <span className="inline-flex items-center gap-1 text-slate-300 font-medium">
+                <span className="material-symbols-rounded text-sm text-[#fe2c55] select-none">
+                  graphic_eq
+                </span>
+                ระดับเสียง (Pitch)
+              </span>
+              <span className="font-mono font-bold text-[#fe2c55]">
+                {currentTuning.pitch > 0
+                  ? `+${currentTuning.pitch}Hz`
+                  : `${currentTuning.pitch}Hz`}
+              </span>
+            </div>
+            <input
+              type="range"
+              data-testid="voice-tuning-pitch"
+              min="-50"
+              max="50"
+              step="1"
+              value={currentTuning.pitch}
+              onChange={(e) =>
+                updateActiveTuning({ pitch: parseInt(e.target.value, 10) })
+              }
+              className="w-full accent-[#fe2c55] cursor-pointer"
+            />
+          </div>
+
+          {/* Volume Slider */}
+          <div className="flex flex-col gap-1.5 bg-[#12141a] p-2.5 rounded-lg border border-white/[0.05]">
+            <div className="flex items-center justify-between text-xs">
+              <span className="inline-flex items-center gap-1 text-slate-300 font-medium">
+                <span className="material-symbols-rounded text-sm text-[#25f4ee] select-none">
+                  volume_up
+                </span>
+                ความดัง (Volume)
+              </span>
+              <span className="font-mono font-bold text-[#25f4ee]">
+                {currentTuning.volume}%
+              </span>
+            </div>
+            <input
+              type="range"
+              data-testid="voice-tuning-volume"
+              min="0"
+              max="200"
+              step="5"
+              value={currentTuning.volume}
+              onChange={(e) =>
+                updateActiveTuning({ volume: parseInt(e.target.value, 10) })
+              }
+              className="w-full accent-[#25f4ee] cursor-pointer"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

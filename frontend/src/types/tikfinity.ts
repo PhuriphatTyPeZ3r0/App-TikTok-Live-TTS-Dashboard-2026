@@ -5,6 +5,18 @@
  * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  */
 
+export interface VoiceTuningConfig {
+  speed: number;
+  pitch: number;
+  volume: number;
+}
+
+export const DEFAULT_VOICE_TUNING: VoiceTuningConfig = {
+  speed: 1.0,
+  pitch: 0,
+  volume: 100,
+};
+
 export interface VoiceProfileInfo {
   id: string;
   name: string;
@@ -13,6 +25,9 @@ export interface VoiceProfileInfo {
   model_id?: string | null;
   edge_voice?: string;
   is_default?: boolean;
+  default_speed?: number;
+  default_pitch?: number;
+  default_volume?: number;
 }
 
 export interface TikFinitySettings {
@@ -31,6 +46,7 @@ export interface TikFinitySettings {
   inDashboardAudio: boolean;
   volume: number;
   selectedVoiceId?: string;
+  voiceTunings?: Record<string, VoiceTuningConfig>;
 }
 
 export interface QueueItem {
@@ -62,4 +78,5 @@ export const DEFAULT_TIKFINITY_SETTINGS: TikFinitySettings = {
   inDashboardAudio: true,
   volume: 1.0,
   selectedVoiceId: 'yuta',
+  voiceTunings: {},
 };

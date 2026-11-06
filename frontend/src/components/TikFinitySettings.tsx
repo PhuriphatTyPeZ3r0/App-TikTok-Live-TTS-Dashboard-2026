@@ -12,7 +12,10 @@
  */
 
 import React, { useState } from "react";
-import { TikFinitySettings as TikFinitySettingsType } from "../types/tikfinity";
+import {
+  TikFinitySettings as TikFinitySettingsType,
+  VoiceTuningConfig,
+} from "../types/tikfinity";
 import { VoiceSelector } from "./VoiceSelector";
 import { TabChatSettings } from "./tabs/TabChatSettings";
 import { TabGiftSettings } from "./tabs/TabGiftSettings";
@@ -25,6 +28,7 @@ export interface TikFinitySettingsProps {
   settings: TikFinitySettingsType;
   onUpdate: (partial: Partial<TikFinitySettingsType>) => void;
   onSelectVoice?: (voiceId: string) => void;
+  onChangeTuning?: (voiceId: string, tuning: VoiceTuningConfig) => void;
   onTestVoice?: (voiceId: string, sampleText: string) => void | Promise<any>;
   backendUrl?: string;
   testingVoiceId?: string | null;
@@ -50,6 +54,7 @@ export function TikFinitySettings({
   settings,
   onUpdate,
   onSelectVoice,
+  onChangeTuning,
   onTestVoice,
   backendUrl = "",
   testingVoiceId = null,
@@ -61,6 +66,12 @@ export function TikFinitySettings({
   const handleVoiceChange = (voiceId: string) => {
     onUpdate({ selectedVoiceId: voiceId });
     onSelectVoice?.(voiceId);
+  };
+
+  const handleTuningChange = (voiceId: string, tuning: VoiceTuningConfig) => {
+    const nextTunings = { ...(settings.voiceTunings || {}), [voiceId]: tuning };
+    onUpdate({ voiceTunings: nextTunings });
+    onChangeTuning?.(voiceId, tuning);
   };
 
   return (
@@ -98,6 +109,8 @@ export function TikFinitySettings({
             <VoiceSelector
               selectedVoiceId={settings.selectedVoiceId || "yuta"}
               onSelectVoice={handleVoiceChange}
+              voiceTunings={settings.voiceTunings}
+              onChangeTuning={handleTuningChange}
               onTestVoice={onTestVoice}
               backendUrl={backendUrl}
               testingVoiceId={testingVoiceId}
@@ -111,6 +124,8 @@ export function TikFinitySettings({
           <VoiceSelector
             selectedVoiceId={settings.selectedVoiceId || "yuta"}
             onSelectVoice={handleVoiceChange}
+            voiceTunings={settings.voiceTunings}
+            onChangeTuning={handleTuningChange}
             onTestVoice={onTestVoice}
             backendUrl={backendUrl}
             testingVoiceId={testingVoiceId}

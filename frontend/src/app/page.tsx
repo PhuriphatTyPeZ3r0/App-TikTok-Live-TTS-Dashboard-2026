@@ -25,7 +25,11 @@ import { LiveQueueConsole } from "../components/LiveQueueConsole";
 import { useTikFinitySettings } from "../hooks/useTikFinitySettings";
 import { useDashboardSocket } from "../hooks/useDashboardSocket";
 import { normalizeTtsText, isUserOnCooldown } from "../lib/textUtils";
-import type { QueueItem } from "../types/tikfinity";
+import {
+  DEFAULT_VOICE_TUNING,
+  type QueueItem,
+  type VoiceTuningConfig,
+} from "../types/tikfinity";
 import type { DashboardEvent } from "../types/dashboard";
 import { Loader2, X } from "lucide-react";
 
@@ -431,10 +435,21 @@ function TikFinityDashboardContent() {
     onUnauthorized: handleUnauthorized,
   });
 
-  // Synchronize selectedVoiceId with Backend REST API (/voice) and WebSocket (set_voice)
+  // Synchronize selectedVoiceId and per-voice tuning with Backend REST API (/voice) and WebSocket (set_voice)
   const syncVoiceWithBackend = useCallback(
-    async (voiceId: string) => {
-      updateSettings({ selectedVoiceId: voiceId });
+    async (voiceId: string, customTuning?: VoiceTuningConfig) => {
+      const activeTuning =
+        customTuning ||
+        settingsRef.current.voiceTunings?.[voiceId] ||
+        DEFAULT_VOICE_TUNING;
+
+      updateSettings({
+        selectedVoiceId: voiceId,
+        voiceTunings: {
+          ...(settingsRef.current.voiceTunings || {}),
+          [voiceId]: activeTuning,
+        },
+      });
       if (typeof window !== "undefined") {
         try {
           window.localStorage.setItem(STREAMVOX_VOICE_STORAGE_KEY, voiceId);
@@ -456,14 +471,19 @@ function TikFinityDashboardContent() {
               "X-Admin-Token": adminToken || tokenParam,
               Authorization: adminToken ? `Bearer ${adminToken}` : "",
             },
-            body: JSON.stringify({ voice_id: voiceId }),
+            body: JSON.stringify({
+              voice_id: voiceId,
+              speed: activeTuning.speed,
+              pitch: activeTuning.pitch,
+              volume: activeTuning.volume,
+            }),
           }
         );
       } catch (err) {
         console.warn("[StreamVox Dashboard] Failed syncing voice via REST /voice:", err);
       }
 
-      // 2. Also send WebSocket message { action: "set_voice", voice_id: voiceId } if connected
+      // 2. Also send WebSocket message { action: "set_voice", voice_id: voiceId, ... } if connected
       if (typeof window !== "undefined" && isConnected && sessionId && adminToken) {
         try {
           const wsProtocol = cleanUrl.startsWith("https") ? "wss:" : "ws:";
@@ -471,13 +491,28 @@ function TikFinityDashboardContent() {
           const wsEndpoint = `${wsProtocol}//${wsHost}/ws/dashboard/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(adminToken)}`;
           const tempWs = new WebSocket(wsEndpoint);
           tempWs.onopen = () => {
-            tempWs.send(JSON.stringify({ action: "set_voice", voice_id: voiceId }));
+            tempWs.send(
+              JSON.stringify({
+                action: "set_voice",
+                voice_id: voiceId,
+                speed: activeTuning.speed,
+                pitch: activeTuning.pitch,
+                volume: activeTuning.volume,
+              })
+            );
             setTimeout(() => tempWs.close(), 250);
           };
         } catch {}
       }
     },
     [backendUrl, sessionId, adminToken, overlayToken, isConnected, updateSettings]
+  );
+
+  const handleChangeVoiceTuning = useCallback(
+    (voiceId: string, tuning: VoiceTuningConfig) => {
+      syncVoiceWithBackend(voiceId, tuning);
+    },
+    [syncVoiceWithBackend]
   );
 
   // Playback & Audio Routing Engine
@@ -504,6 +539,8 @@ function TikFinityDashboardContent() {
       const currentSettings = settingsRef.current;
       const isStale = () => currentPlayIdRef.current !== thisPlayId;
       const activeVoiceId = nextItem.voiceId || currentSettings.selectedVoiceId || "yuta";
+      const activeTuning =
+        currentSettings.voiceTunings?.[activeVoiceId] || DEFAULT_VOICE_TUNING;
 
       // Always dispatch synthesis request to backend so OBS Overlay receives audio via WebSocket broadcast
       try {
@@ -527,6 +564,9 @@ function TikFinityDashboardContent() {
             text: nextItem.text,
             user: nextItem.username,
             voice_id: activeVoiceId,
+            speed: activeTuning.speed,
+            pitch: activeTuning.pitch,
+            volume: activeTuning.volume,
           }),
         });
 
@@ -793,6 +833,7 @@ function TikFinityDashboardContent() {
           settings={settings}
           onUpdate={updateSettings}
           onSelectVoice={syncVoiceWithBackend}
+          onChangeTuning={handleChangeVoiceTuning}
           onTestVoice={handleTestSpecificVoice}
           backendUrl={backendUrl}
           testingVoiceId={testingVoiceId}
