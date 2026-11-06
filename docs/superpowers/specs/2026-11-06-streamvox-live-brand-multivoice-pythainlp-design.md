@@ -88,15 +88,16 @@ StreamVox Live ถูกออกแบบขึ้นมาเพื่อย�
 ### 4.2 Multi-Voice Model Architecture
 ระบบรองรับ 5 โปรไฟล์เสียงที่คัดเลือกมาอย่างเหมาะสม:
 1. **พิพัฒน์ บุญสิทธิเลิศ (Yuta - Primary):** Model ID `9c110ffde8bc42709516395dfbcfb4a2` บน Fish Audio (เสียงมาตรฐานสำหรับพูดคุยทั่วไป)
-2. **ฮานะ (Hana Sweet - Anime Female):** โมเดลเสียงสาวหวาน อนิเมะ น่ารัก สดใส (จับคู่กับ `th-TH-PremwadeeNeural` บน Edge-TTS เมื่อต้องการความเร็วสูงหรือสำรองฟรี)
-3. **ดีเจโจ๊กเกอร์ (DJ Hype - Comedy):** โมเดลเสียงกระตือรือร้น เฮฮา เหมาะกับการอ่านของขวัญ
-4. **ผู้ประกาศข่าว ชาย (News Anchor Pro):** โมเดลเสียงทุ้ม ชัด สุภาพ
+2. **ฮานะ (Hana Sweet - Anime Female):** โมเดลสาวหวาน อนิเมะ น่ารัก (Fish Audio Model ID กำหนดผ่าน env `FISH_AUDIO_HANA_MODEL_ID` หรือ Fallback สู่ `th-TH-PremwadeeNeural` บน Edge-TTS เมื่อไม่มี Model ID)
+3. **ดีเจโจ๊กเกอร์ (DJ Hype - Comedy):** โมเดลเสียงกระตือรือร้น เฮฮา (Fish Audio Model ID ผ่าน env `FISH_AUDIO_JOKER_MODEL_ID` หรือ Fallback สู่ `th-TH-NiwatNeural` พร้อมปรับ Pitch/Rate เล็กน้อย)
+4. **ผู้ประกาศข่าว ชาย (News Anchor Pro):** โมเดลเสียงทุ้ม ชัด สุภาพ (Fish Audio Model ID ผ่าน env `FISH_AUDIO_ANCHOR_MODEL_ID` หรือ Fallback สู่ `th-TH-NiwatNeural`)
 5. **นิวัฒน์ นิวรัล (Niwat Neural - Fallback):** Microsoft Edge-TTS (`th-TH-NiwatNeural`) ฟรี ไม่จำกัดโควต้า ค่าความหน่วงต่ำ (<1s)
 
 **Data Contract & State Synchronization:**
 - เพิ่ม `selected_voice_id` บน `SessionInstance` ใน Backend เพื่อให้แชทที่ถูก Ingest มาจาก TikTok ทำการสังเคราะห์เสียงด้วยโปรไฟล์ที่สตรีมเมอร์เลือกเสมอ
 - หน้า Dashboard ส่งคำสั่งอัปเดตผ่าน WebSocket: `{ "action": "set_voice", "voice_id": "yuta" }` และ REST API `/api/session/{id}/voice`
 - บันทึก `selectedVoiceId` ใน `localStorage` ของ Dashboard เพื่อจดจำค่าอัตโนมัติ
+- **Colab Routing Isolation:** เมื่อเปิดใช้ Google Colab / ZeroGPU Tunnel ระบบจะส่งเฉพาะเสียง `yuta` ไปยัง Colab เท่านั้น สำหรับโปรไฟล์เสียงอื่นๆ จะส่งตรงไปยัง Fish Audio API หรือ Edge-TTS เพื่อป้องกันไม่ให้เสียงอื่นถูกแปลงเป็นเสียงยูตะ
 
 ### 4.3 PyThaiNLP Text Normalization Pipeline
 สร้างโมดูล `src/thai_normalizer.py` โดยมีขั้นตอนการแปลง:
@@ -108,11 +109,12 @@ StreamVox Live ถูกออกแบบขึ้นมาเพื่อย�
    - แปลงคำย่อ: `กุ` -> `กู`, `มุง` -> `มึง`, `จิง` -> `จริง`, `คับ/งับ` -> `ครับ`, `ป่าว/ป้ะ` -> `หรือเปล่า`
 3. **English Loanword Transliteration:**
    - พจนานุกรมคำยอดนิยมในไลฟ์: `Live` -> `ไลฟ์`, `Stream` -> `สตรีม`, `Game` -> `เกม`, `PK` -> `พีเค`, `Gift` -> `กิฟต์`, `ROV` -> `อาร์โอวี`
-4. **Word Tokenization & Pacing Adjustment:**
-   - ใช้ `pythainlp.tokenize.word_tokenize(text, engine='newmm')` เพื่อตัดคำ
-   - แทรกเว้นวรรคบางๆ ในจุดที่เหมาะสม เพื่อให้โมเดล AI อ่านเป็นจังหวะจะโคน ไม่รัวหรือกลืนเสียง
+4. **Word Tokenization & Pacing Adjustment (Acoustic Pacing Heuristic):**
+   - ไม่ใช้ `str.join(" ")` บนทุกคำภาษาไทย เพราะจะทำให้เกิดเสียงสะดุดเหมือนหุ่นยนต์
+   - ใช้ `pythainlp.tokenize.word_tokenize(text, engine='newmm')` เพื่อระบุขอบเขตคำภาษาอังกฤษ คำแสลง และเครื่องหมายวรรคตอน
+   - แทรกช่องว่างเฉพาะจุดรอยต่อระหว่างคำไทยกับคำทับศัพท์ หรือคำเชื่อมประโยค (`และ`, `หรือ`, `แต่`) เพื่อสร้างจังหวะการหายใจที่สมจริง
 5. **Performance & Caching:**
-   - ใช้ `@functools.lru_cache(maxsize=2048)` สำหรับประโยคที่พบบ่อย ลดเวลาประมวลผลเหลือ < 1ms
+   - ใช้ `@functools.lru_cache(maxsize=4096)` สำหรับประโยคที่พบบ่อย ลดเวลาประมวลผลเหลือ < 1ms
 
 ---
 

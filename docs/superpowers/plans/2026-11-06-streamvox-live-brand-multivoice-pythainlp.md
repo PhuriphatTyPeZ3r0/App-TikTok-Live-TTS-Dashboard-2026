@@ -144,13 +144,14 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'src.voice_registry'`
 - Define `VoiceProfile(id, name, description, engine, model_id, edge_voice, is_default)`
 - Register 5 profiles:
   - `yuta`: Fish Audio Model `9c110ffde8bc42709516395dfbcfb4a2` (Primary Default)
-  - `hana`: Fish Audio Sweet Girl (`th-TH-PremwadeeNeural` Edge fallback)
-  - `joker`: Fish Audio DJ Hype / Comedy
-  - `anchor`: Fish Audio News Anchor Pro
+  - `hana`: Fish Audio Sweet Girl (Configurable via `FISH_AUDIO_HANA_MODEL_ID` with `th-TH-PremwadeeNeural` Edge fallback)
+  - `joker`: Fish Audio DJ Hype / Comedy (Configurable via `FISH_AUDIO_JOKER_MODEL_ID` with `th-TH-NiwatNeural` Edge fallback)
+  - `anchor`: Fish Audio News Anchor Pro (Configurable via `FISH_AUDIO_ANCHOR_MODEL_ID` with `th-TH-NiwatNeural` Edge fallback)
   - `niwat`: Edge-TTS `th-TH-NiwatNeural`
-- Update `TTSEngine.synthesize()` to:
+- Update `TTSEngine.synthesize()`:
   1. Pass text through `normalize_thai_speech(text)` first.
-  2. Synthesize using the target profile's engine and model ID.
+  2. If Colab / ZeroGPU is active (`prefer_colab_tts = True`), route to Colab **strictly if `voice_id == "yuta"`**. All other voices bypass Colab and route to their designated Fish Audio / Edge-TTS engine.
+  3. Synthesize using the target profile's engine and model ID.
 - Add `selected_voice_id: str = "yuta"` to `SessionInstance` in `src/session_manager.py`.
 
 - [ ] **Step 4: Run test to verify it passes**
