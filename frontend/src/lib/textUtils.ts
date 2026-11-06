@@ -53,7 +53,9 @@ export function normalizeTtsText(rawText: string, options?: NormalizeOptions): N
     .trim();
 
   // 3. Character Repetition Clamp: Clamp excessive repeated characters (> 2) to 2
-  processed = processed.replace(/(.)\1{2,}/g, '$1$1');
+  // Unicode /u flag ensures multi-byte surrogate pairs (emojis) are properly clamped.
+  const repeatRegex = new RegExp('(.)\\1{2,}', 'gu');
+  processed = processed.replace(repeatRegex, '$1$1');
 
   // Secondary check for banned words after repeated characters collapsed (e.g. "spppaaammm")
   if (options?.bannedWords && options.bannedWords.length > 0) {
@@ -75,8 +77,8 @@ export function normalizeTtsText(rawText: string, options?: NormalizeOptions): N
     processed = processed.slice(0, options.maxCharacters);
   }
 
-  // 5. Username Formatting
-  if (options?.readUsername && options.username && options.username.trim().length > 0) {
+  // 5. Username Formatting (only if processed text is not empty)
+  if (options?.readUsername && options.username && options.username.trim().length > 0 && processed.length > 0) {
     processed = `${options.username.trim()} บอกว่า: ${processed}`;
   }
 

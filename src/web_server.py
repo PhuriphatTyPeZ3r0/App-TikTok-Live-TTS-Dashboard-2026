@@ -805,13 +805,15 @@ async def test_voice_synthesis(
             logger.warning("TTS synthesis failed in test_voice: %s", exc)
 
     engine_name = getattr(session.tts_engine, "last_engine", "Fish Audio") if session.tts_engine else "Fish Audio"
+    target_user = body_data.get("user") or "System (ระบบ)"
     payload = {
         "type": "ALERT",
         "audio_base64": b64_audio,
-        "user": "System (ระบบ)",
+        "user": target_user,
+        "user_id": target_user,
         "text": custom_text,
-        "gift_name": None,
-        "gift_count": 0,
+        "gift_name": body_data.get("gift_name"),
+        "gift_count": body_data.get("gift_count", 0),
         "engine": engine_name,
     }
     await broadcast_to_overlays(session.session_id, payload)
@@ -822,6 +824,7 @@ async def test_voice_synthesis(
         "session_id": session.session_id,
         "text": custom_text,
         "engine": getattr(session.tts_engine, "last_engine", engine_name) if session.tts_engine else engine_name,
+        "audio_base64": b64_audio,
     }
 
 

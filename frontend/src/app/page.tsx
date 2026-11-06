@@ -245,8 +245,18 @@ function TikFinityDashboardContent() {
       };
 
       if (currentSettings.giftPriorityQueue) {
-        // Prepend gift to head of queue (priority jump ahead of chat!)
-        setQueue((prev) => [newGiftItem, ...prev]);
+        // Prepend gift ahead of chat while maintaining FIFO order among multiple gifts
+        setQueue((prev) => {
+          const firstChatIdx = prev.findIndex((item) => !item.isGift);
+          if (firstChatIdx === -1) {
+            return [...prev, newGiftItem];
+          }
+          return [
+            ...prev.slice(0, firstChatIdx),
+            newGiftItem,
+            ...prev.slice(firstChatIdx),
+          ];
+        });
       } else {
         setQueue((prev) => [...prev, newGiftItem]);
       }
@@ -313,19 +323,7 @@ function TikFinityDashboardContent() {
       const currentSettings = settingsRef.current;
       const isStale = () => currentPlayIdRef.current !== thisPlayId;
 
-      // In-Dashboard Audio disabled: Let OBS Overlay perform audio playback
-      if (!currentSettings.inDashboardAudio) {
-        const simulatedMs = Math.max(2500, Math.min(10000, nextItem.text.length * 120));
-        setTimeout(() => {
-          if (!isStale()) {
-            setIsPlaying(false);
-            setCurrentSpeaker(null);
-          }
-        }, simulatedMs);
-        return;
-      }
-
-      // In-Dashboard Audio enabled: Request audio synthesis
+      // Always dispatch synthesis request to backend so OBS Overlay receives audio via WebSocket broadcast
       try {
         const cleanUrl = backendUrl.replace(/\/+$/, "");
         const targetUrl = sessionId && sessionId !== "default_session"
@@ -354,28 +352,41 @@ function TikFinityDashboardContent() {
         if (res.ok) {
           const data = await res.json();
           if (data.audio_base64 && !isStale()) {
-            const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
-            audio.volume = Math.max(0, Math.min(1, currentSettings.volume));
-            audioRef.current = audio;
+            if (currentSettings.inDashboardAudio) {
+              const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
+              audio.volume = Math.max(0, Math.min(1, currentSettings.volume));
+              audioRef.current = audio;
 
-            audio.onended = () => {
-              if (!isStale()) {
-                audioRef.current = null;
-                setIsPlaying(false);
-                setCurrentSpeaker(null);
-              }
-            };
+              audio.onended = () => {
+                if (!isStale()) {
+                  audioRef.current = null;
+                  setIsPlaying(false);
+                  setCurrentSpeaker(null);
+                }
+              };
 
-            audio.onerror = () => {
-              if (!isStale()) {
-                audioRef.current = null;
-                setIsPlaying(false);
-                setCurrentSpeaker(null);
-              }
-            };
+              audio.onerror = () => {
+                if (!isStale()) {
+                  audioRef.current = null;
+                  setIsPlaying(false);
+                  setCurrentSpeaker(null);
+                }
+              };
 
-            await audio.play();
-            return;
+              await audio.play();
+              return;
+            } else {
+              // In-Dashboard Audio is disabled (echo prevention): OBS Overlay handles playback.
+              // Wait for simulated playback duration then advance queue smoothly.
+              const simulatedMs = Math.max(2500, Math.min(10000, nextItem.text.length * 120));
+              setTimeout(() => {
+                if (!isStale()) {
+                  setIsPlaying(false);
+                  setCurrentSpeaker(null);
+                }
+              }, simulatedMs);
+              return;
+            }
           }
         }
       } catch (err: any) {
@@ -387,8 +398,8 @@ function TikFinityDashboardContent() {
 
       if (isStale()) return;
 
-      // Fallback: Web Speech API synthesis in browser
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      // Fallback: Web Speech API synthesis in browser (only if inDashboardAudio is enabled)
+      if (currentSettings.inDashboardAudio && typeof window !== "undefined" && "speechSynthesis" in window) {
         const utterance = new SpeechSynthesisUtterance(nextItem.text);
         utterance.lang = "th-TH";
         utterance.volume = Math.max(0, Math.min(1, currentSettings.volume));
@@ -411,8 +422,8 @@ function TikFinityDashboardContent() {
         return;
       }
 
-      // Safe fallback timer
-      const fallbackMs = Math.max(2500, nextItem.text.length * 100);
+      // Safe fallback timer (if inDashboardAudio is false or synthesis failed)
+      const fallbackMs = Math.max(2000, Math.min(8000, nextItem.text.length * 100));
       setTimeout(() => {
         if (!isStale()) {
           setIsPlaying(false);
