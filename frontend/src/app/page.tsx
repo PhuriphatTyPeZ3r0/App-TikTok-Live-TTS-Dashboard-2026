@@ -457,7 +457,7 @@ function TikFinityDashboardContent() {
         if (res.ok) {
           const data = await res.json();
           if (data.audio_base64 && !isStale()) {
-            if (currentSettings.inDashboardAudio) {
+            if (currentSettings.inDashboardAudio || nextItem.isTest) {
               const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
               audio.volume = Math.max(0, Math.min(1, currentSettings.volume));
               audioRef.current = audio;
@@ -601,21 +601,28 @@ function TikFinityDashboardContent() {
     setQueue((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  const handleQuickVoiceTest = useCallback(async () => {
+  const handleQuickVoiceTest = useCallback(() => {
     setIsTestingVoice(true);
-    try {
-      const sampleText = "ทดสอบระบบเสียงสังเคราะห์ ติ๊กต็อกไลฟ์สำเร็จ";
-      const success = await testVoice(sampleText);
-      if (!success) {
-        handleUnauthorized();
-      }
-    } catch (err) {
-      console.error("[TikFinity Dashboard] Voice test failed:", err);
-      handleUnauthorized();
-    } finally {
+    const sampleText = "ทดสอบระบบเสียงสังเคราะห์ ติ๊กต็อกไลฟ์สำเร็จ";
+    const testItem: QueueItem = {
+      id: `test-${Date.now()}`,
+      username: "ระบบ (System)",
+      text: sampleText,
+      isGift: false,
+      timestamp: Date.now(),
+      isTest: true,
+    };
+
+    // If queue is currently paused, unpause so playback begins immediately
+    setIsPaused(false);
+
+    // Prepend to front of queue for instant processing
+    setQueue((prev) => [testItem, ...prev]);
+
+    setTimeout(() => {
       setIsTestingVoice(false);
-    }
-  }, [testVoice, handleUnauthorized]);
+    }, 1000);
+  }, []);
 
   // Start or Connect to TikTok Room
   const handleStartRoomSession = async (e: React.FormEvent) => {

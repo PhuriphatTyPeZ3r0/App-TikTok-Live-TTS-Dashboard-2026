@@ -461,7 +461,18 @@ export function useDashboardSocket({
           return false;
         }
 
-        return res.ok;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.audio_base64 && typeof window !== "undefined" && typeof Audio !== "undefined") {
+            const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
+            audio.play().catch((playErr) => {
+              console.warn("[useDashboardSocket] Direct audio playback failed:", playErr);
+            });
+          }
+          return true;
+        }
+
+        return false;
       } catch (err) {
         console.error("[useDashboardSocket] testVoice execution error:", err);
         return false;

@@ -29,6 +29,7 @@ export interface QueueItem {
   giftAmount?: number;
   coins?: number;
   timestamp: number;
+  isTest?: boolean;
 }
 
 export const DEFAULT_TIKFINITY_SETTINGS: TikFinitySettings = {
