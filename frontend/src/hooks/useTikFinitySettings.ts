@@ -49,9 +49,17 @@ export function useTikFinitySettings(): UseTikFinitySettingsReturn {
   // Update a subset of settings and persist to localStorage
   const updateSettings = useCallback((partial: Partial<TikFinitySettings>) => {
     setSettings((prev) => {
-      const updated = {
+      const updated: TikFinitySettings = {
         ...prev,
         ...partial,
+        ...(partial.voiceTunings
+          ? {
+              voiceTunings: {
+                ...(prev.voiceTunings || {}),
+                ...partial.voiceTunings,
+              },
+            }
+          : {}),
       };
 
       if (typeof window !== 'undefined') {

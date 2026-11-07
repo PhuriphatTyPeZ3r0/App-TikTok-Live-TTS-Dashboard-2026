@@ -23,6 +23,7 @@ import { Navbar } from "../components/Navbar";
 import { TikFinitySettings } from "../components/TikFinitySettings";
 import { LiveQueueConsole } from "../components/LiveQueueConsole";
 import { useTikFinitySettings } from "../hooks/useTikFinitySettings";
+import { useSupabaseSync } from "../hooks/useSupabaseSync";
 import { useDashboardSocket } from "../hooks/useDashboardSocket";
 import { normalizeTtsText, isUserOnCooldown } from "../lib/textUtils";
 import {
@@ -66,6 +67,19 @@ function TikFinityDashboardContent() {
 
   // TikFinity Settings Hook
   const { settings, updateSettings, isLoaded: settingsLoaded } = useTikFinitySettings();
+
+  // Cloud Settings Synchronization Hook (Supabase PostgreSQL public.user_profiles)
+  const {
+    isSyncing,
+    lastSyncedAt,
+    syncError,
+    isCloudSyncActive,
+    manualSync,
+  } = useSupabaseSync({
+    settings,
+    onHydrate: updateSettings,
+    debounceMs: 1000,
+  });
 
   // Active selectedVoiceId state synchronized with settings & localStorage
   const selectedVoiceId = settings.selectedVoiceId || "yuta";
@@ -854,6 +868,11 @@ function TikFinityDashboardContent() {
           testingVoiceId={testingVoiceId}
           sessionId={sessionId}
           overlayToken={overlayToken}
+          isSyncing={isSyncing}
+          isCloudSyncActive={isCloudSyncActive}
+          lastSyncedAt={lastSyncedAt}
+          syncError={syncError}
+          onManualSync={manualSync}
         />
 
         {/* Right Column (0.85fr): Live Queue & Playback Console */}
