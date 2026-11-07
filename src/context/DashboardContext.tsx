@@ -898,3 +898,18 @@ export function useDashboard(): DashboardContextType {
   }
   return context;
 }
+
+/**
+ * useDashboardSafe React Hook
+ *
+ * Safe variant of useDashboard that returns null instead of throwing an error
+ * when invoked outside of a <DashboardProvider /> component tree (e.g. in standalone tests).
+ */
+export function useDashboardSafe(): DashboardContextType | null {
+  try {
+    const context = useContext(DashboardContext);
+    return context ?? null;
+  } catch {
+    return null;
+  }
+}

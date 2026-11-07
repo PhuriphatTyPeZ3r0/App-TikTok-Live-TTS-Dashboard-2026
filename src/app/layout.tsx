@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "../context/ThemeContext";
 import { DashboardProvider } from "../context/DashboardContext";
+import { PersistentAudioPlayer } from "../components/PersistentAudioPlayer";
 import "./globals.css";
 
 /**
@@ -55,7 +56,10 @@ export default function RootLayout({
       <body className="font-sans antialiased bg-white dark:bg-broadcast-dark text-broadcast-dark dark:text-white min-h-screen min-h-[100dvh] transition-colors duration-200">
         <ThemeProvider>
           <DashboardProvider>
-            {children}
+            <div className="pb-20 sm:pb-20 min-h-screen min-h-[100dvh] flex flex-col">
+              {children}
+            </div>
+            <PersistentAudioPlayer />
           </DashboardProvider>
         </ThemeProvider>
       </body>
