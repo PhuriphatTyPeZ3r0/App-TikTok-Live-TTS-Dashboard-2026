@@ -1,25 +1,39 @@
 "use client";
 
 /**
- * StreamVox Live Hybrid Responsive Sidebar Navigation Component for Next.js 15.
+ * StreamVox Live Hybrid Responsive Collapsible Sidebar Component for Next.js 15.
  *
- * Implements dual-mode responsive layout:
- * - Desktop View (>= 768px): Collapsible icon rail (72px) vs expanded navigation drawer (240px)
- * - Mobile / Tablet View (< 768px): High-performance slide-over drawer with backdrop blur,
- *   supporting touch gestures, Apple Safe Area Insets, and Samsung One UI touch guidelines.
+ * Implements a dual-mode responsive layout adhering to Clean Minimal Enterprise Design System (DS)
+ * and Web Content Accessibility Guidelines (WCAG) 2.1 & 2.2 Level AA:
+ * - Desktop View (>= 768px): Persistent collapsible sidebar rail (`w-16` / 64px collapsed vs `w-64` / 256px expanded)
+ *   with smooth transition animations, hover/focus tooltips for icon-rail mode, and bottom toggle button.
+ * - Mobile / Tablet View (< 768px): High-performance off-canvas slide-over drawer (`w-72`) with backdrop overlay blur
+ *   (`bg-black/60 backdrop-blur-sm z-40`), close button with touch target >= 44x44px, and safe-area insets (`pt-safe`, `pb-safe`)
+ *   for Apple iPhone (iOS Safari Dynamic Island/Notch) and Samsung Galaxy (Android One UI Gesture Navigation Bar).
  *
- * Coordinates with Single-Page Application (SPA) dashboard, communicating with the FastAPI
+ * Interacts with Single-Page Application (SPA) dashboard communicating with FastAPI
  * Asynchronous Server Gateway Interface (ASGI) server, Web Audio Application Programming Interface
- * (Web Audio API), and First-In, First-Out (FIFO) queue states.
+ * (Web Audio API), Open Broadcaster Software (OBS) Studio, and First-In, First-Out (FIFO) queue states.
  *
- * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert) - Thai Voice Model
+ * Zero Hardcoded Colors: Uses semantic tokens (`bg-card`, `text-card-foreground`, `border-border`,
+ * `bg-primary`, `text-primary-foreground`, `bg-muted`, `text-muted-foreground`, etc.).
+ *
+ * Voice Actor Attribution:
+ * Dedicated to Master Thai Voice Model: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert).
  *
  * Mandatory Academic Terminology & Acronyms:
+ * - User Interface (UI)
+ * - User Experience (UX)
+ * - Design System (DS)
+ * - Web Content Accessibility Guidelines (WCAG)
  * - Single-Page Application (SPA)
  * - Asynchronous Server Gateway Interface (ASGI)
  * - Role-Based Access Control (RBAC)
  * - Row Level Security (RLS)
  * - First-In, First-Out (FIFO)
+ * - Open Broadcaster Software (OBS)
+ * - Text-to-Speech (TTS)
+ * - Application Programming Interface (API)
  */
 
 import React, { useEffect, useCallback } from "react";
@@ -32,26 +46,50 @@ import {
   ScrollText,
   X,
   Radio,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+export type TabType =
+  | "cockpit"
+  | "queue"
+  | "voice"
+  | "settings"
+  | "obs"
+  | "logs"
+  | string;
 
 export interface SidebarItem {
-  id: string;
+  id: TabType;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
 }
 
 export interface SidebarProps {
-  /** Whether sidebar is collapsed into a 72px icon rail or expanded to 240px on desktop. */
-  isCollapsed: boolean;
   /** Currently selected navigation tab id. Defaults to "cockpit". */
-  activeTab?: string;
+  activeTab?: TabType;
   /** Callback triggered when a navigation item is clicked. */
+  onTabChange?: (tab: TabType) => void;
+  /** Backward compatibility callback triggered when a navigation item is clicked. */
   onSelectTab?: (tabId: string) => void;
-  /** Whether the mobile slide-over drawer is currently open. */
+  /** Whether sidebar is collapsed into w-16 icon rail or expanded to w-64 on desktop. */
+  isCollapsed: boolean;
+  /** Callback to toggle collapse/expand state of the desktop sidebar. */
+  onToggleCollapse?: () => void;
+  /** Whether the mobile slide-over off-canvas drawer is currently open. */
   isMobileOpen?: boolean;
-  /** Callback to close the mobile slide-over drawer. */
+  /** Callback to close the mobile slide-over off-canvas drawer. */
+  onMobileClose?: () => void;
+  /** Backward compatibility callback to close the mobile drawer. */
   onCloseMobile?: () => void;
+  /** Live FIFO queue count for displaying badge indicator. */
+  liveQueueCount?: number;
+  /** Whether live streaming connection is active. */
+  isStreaming?: boolean;
+  /** Optional custom CSS classes. */
+  className?: string;
 }
 
 export const SIDEBAR_ITEMS: SidebarItem[] = [
@@ -88,20 +126,36 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
 ];
 
 export function Sidebar({
-  isCollapsed,
   activeTab = "cockpit",
+  onTabChange,
   onSelectTab,
+  isCollapsed,
+  onToggleCollapse,
   isMobileOpen = false,
+  onMobileClose,
   onCloseMobile,
+  liveQueueCount = 0,
+  isStreaming = false,
+  className = "",
 }: SidebarProps): React.JSX.Element {
-  // Handle keyboard Escape to dismiss mobile drawer
+  // Safe helper to invoke mobile close callbacks
+  const handleCloseMobile = useCallback(() => {
+    if (onMobileClose) {
+      onMobileClose();
+    }
+    if (onCloseMobile) {
+      onCloseMobile();
+    }
+  }, [onMobileClose, onCloseMobile]);
+
+  // Handle keyboard Escape to dismiss mobile drawer per WCAG 2.1 AA
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isMobileOpen && onCloseMobile) {
-        onCloseMobile();
+      if (e.key === "Escape" && isMobileOpen) {
+        handleCloseMobile();
       }
     },
-    [isMobileOpen, onCloseMobile]
+    [isMobileOpen, handleCloseMobile]
   );
 
   useEffect(() => {
@@ -118,12 +172,15 @@ export function Sidebar({
     };
   }, [isMobileOpen, handleKeyDown]);
 
-  const handleItemClick = (tabId: string) => {
+  const handleItemClick = (tabId: TabType) => {
+    if (onTabChange) {
+      onTabChange(tabId);
+    }
     if (onSelectTab) {
       onSelectTab(tabId);
     }
-    if (onCloseMobile) {
-      onCloseMobile();
+    if (isMobileOpen) {
+      handleCloseMobile();
     }
   };
 
@@ -133,62 +190,151 @@ export function Sidebar({
       {/* 1. Desktop Persistent / Collapsible Sidebar (md:flex)                */}
       {/* ==================================================================== */}
       <aside
-        className={`hidden md:flex flex-col h-[calc(100vh-3.75rem)] sticky top-[3.75rem] left-0 shrink-0 bg-[#0c0d12]/95 border-r border-[#1e222d] backdrop-blur-xl transition-all duration-300 ease-in-out z-40 select-none ${
-          isCollapsed ? "w-[72px]" : "w-[240px]"
-        }`}
+        className={cn(
+          "hidden md:flex flex-col fixed top-[3.75rem] left-0 bottom-0 z-30 bg-card text-card-foreground border-r border-border transition-all duration-300 ease-in-out select-none",
+          isCollapsed ? "w-16" : "w-64",
+          className
+        )}
         aria-label="Studio Desktop Sidebar Navigation"
       >
-        <div className="flex flex-col h-full py-4 px-2 justify-between">
+        <div className="flex flex-col h-full py-3 px-2 justify-between overflow-y-auto no-scrollbar">
           {/* Navigation Item List */}
-          <nav className="flex flex-col gap-1.5" role="navigation" aria-label="Main Navigation">
+          <nav
+            className="flex flex-col gap-1.5"
+            role="navigation"
+            aria-label="Main Navigation"
+          >
             {SIDEBAR_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              const showQueueBadge = item.id === "queue" && liveQueueCount > 0;
 
               return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleItemClick(item.id)}
-                  title={item.label}
-                  className={`flex items-center gap-3.5 rounded-xl transition-all duration-150 text-left min-h-[44px] ${
-                    isCollapsed ? "justify-center px-0 py-2.5" : "px-3.5 py-2.5"
-                  } ${
-                    isActive
-                      ? "bg-gradient-to-r from-[#fe2c55]/20 to-[#25f4ee]/20 border border-white/15 text-white font-semibold shadow-sm"
-                      : "text-slate-400 hover:text-white hover:bg-white/[0.05] font-normal"
-                  }`}
-                >
-                  <Icon
-                    className={`w-5 h-5 shrink-0 transition-colors ${
-                      isActive ? "text-neutral-900 dark:text-white" : "text-slate-400"
-                    }`}
-                  />
-                  {!isCollapsed && (
-                    <span className="text-xs tracking-tight truncate leading-tight font-sans">
-                      {item.label}
-                    </span>
+                <div key={item.id} className="relative group">
+                  <button
+                    type="button"
+                    onClick={() => handleItemClick(item.id)}
+                    aria-current={isActive ? "page" : undefined}
+                    aria-label={item.label}
+                    className={cn(
+                      "flex items-center rounded-xl transition-all duration-150 text-left min-h-[44px] min-w-[44px] w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
+                      isCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5 gap-3",
+                      isActive
+                        ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/60 font-normal"
+                    )}
+                  >
+                    <div className="relative flex items-center justify-center shrink-0">
+                      <Icon className="w-5 h-5" />
+                      {showQueueBadge && isCollapsed && (
+                        <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center animate-pulse">
+                          {liveQueueCount}
+                        </span>
+                      )}
+                    </div>
+
+                    {!isCollapsed && (
+                      <div className="flex items-center justify-between w-full min-w-0">
+                        <span className="text-xs tracking-tight truncate leading-tight">
+                          {item.label}
+                        </span>
+                        {showQueueBadge && (
+                          <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground font-mono">
+                            {liveQueueCount}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Accessible Hover / Focus Tooltip when collapsed */}
+                  {isCollapsed && (
+                    <div
+                      role="tooltip"
+                      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 hidden group-hover:flex group-focus-within:flex items-center px-2.5 py-1 rounded-md bg-popover text-popover-foreground text-xs font-medium shadow-md border border-border whitespace-nowrap z-50 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      <span>{item.label}</span>
+                      {showQueueBadge && (
+                        <span className="ml-1.5 px-1.5 py-0.2 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                          {liveQueueCount}
+                        </span>
+                      )}
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
           </nav>
 
-          {/* Desktop Footer Card */}
-          {!isCollapsed && (
-            <div className="p-3 mx-1 rounded-xl bg-white/[0.03] border border-[#1e222d] text-[10px] text-slate-400">
-              <div className="flex items-center gap-1.5 font-semibold text-slate-200 mb-1">
-                <Radio className="w-3.5 h-3.5 text-[#fe2c55] animate-pulse" />
-                <span>StreamVox Live PRO</span>
+          {/* Desktop Footer Card & Bottom Collapse/Expand Toggle */}
+          <div className="flex flex-col gap-2 pt-2">
+            {!isCollapsed && (
+              <div className="p-3 mx-1 rounded-xl bg-muted/40 border border-border text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5 font-semibold text-foreground mb-1">
+                  <Radio
+                    className={cn(
+                      "w-3.5 h-3.5",
+                      isStreaming ? "text-destructive animate-pulse" : "text-muted-foreground"
+                    )}
+                  />
+                  <span>StreamVox Live PRO</span>
+                </div>
+                <div className="truncate text-foreground/80">
+                  เสียงพากย์: คุณพิพัฒน์ บุญสิทธิเลิศ
+                </div>
+                <div className="font-mono text-[10px] text-muted-foreground mt-1">
+                  v2.1 • FastAPI &amp; FIFO Queue
+                </div>
               </div>
-              <div className="text-slate-400 truncate">
-                เสียงพากย์: พิพัฒน์ บุญสิทธิเลิศ
+            )}
+
+            {/* Bottom Collapse Toggle Button */}
+            {onToggleCollapse && (
+              <div className="pt-2 border-t border-border">
+                <div className="relative group">
+                  <button
+                    type="button"
+                    onClick={onToggleCollapse}
+                    className={cn(
+                      "flex items-center rounded-xl transition-colors min-h-[44px] min-w-[44px] w-full text-muted-foreground hover:text-foreground hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
+                      isCollapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5 gap-3"
+                    )}
+                    aria-label={
+                      isCollapsed
+                        ? "ขยายแถบข้าง (Expand sidebar)"
+                        : "ย่อแถบข้าง (Collapse sidebar)"
+                    }
+                    title={
+                      isCollapsed
+                        ? "ขยายแถบข้าง (Expand sidebar)"
+                        : "ย่อแถบข้าง (Collapse sidebar)"
+                    }
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="w-5 h-5 shrink-0" />
+                    ) : (
+                      <>
+                        <ChevronLeft className="w-5 h-5 shrink-0" />
+                        <span className="text-xs font-medium truncate">
+                          ย่อแถบข้าง (Collapse)
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Tooltip for Collapse Toggle button in collapsed state */}
+                  {isCollapsed && (
+                    <div
+                      role="tooltip"
+                      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 hidden group-hover:flex group-focus-within:flex items-center px-2.5 py-1 rounded-md bg-popover text-popover-foreground text-xs font-medium shadow-md border border-border whitespace-nowrap z-50 animate-in fade-in zoom-in-95 duration-150"
+                    >
+                      ขยายแถบข้าง (Expand sidebar)
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="font-mono text-[9px] text-slate-500 mt-1">
-                v2.1 • FastAPI &amp; FIFO
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </aside>
 
@@ -204,34 +350,32 @@ export function Sidebar({
         >
           {/* Backdrop Blur Overlay */}
           <div
-            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity duration-200 animate-in fade-in"
-            onClick={onCloseMobile}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200 z-40 animate-in fade-in"
+            onClick={handleCloseMobile}
             aria-hidden="true"
           />
 
           {/* Slide-over Drawer Surface */}
-          <div
-            className="relative w-72 max-w-[85vw] h-full bg-[#0c0d12]/98 border-r border-[#1e222d] shadow-2xl flex flex-col justify-between p-4 pt-safe pb-safe z-50 animate-in slide-in-from-left duration-200"
-          >
-            <div className="flex flex-col gap-4">
+          <div className="relative w-72 max-w-[85vw] h-full bg-card text-card-foreground border-r border-border shadow-2xl flex flex-col justify-between p-4 pt-safe pb-safe z-50 animate-in slide-in-from-left duration-200">
+            <div className="flex flex-col gap-4 overflow-y-auto no-scrollbar">
               {/* Drawer Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#1e222d]">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center text-black font-extrabold text-sm shadow-md shrink-0">
-                    <span className="material-symbols-rounded text-lg text-black select-none">
+                  <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-extrabold text-sm shadow-xs shrink-0">
+                    <span className="material-symbols-rounded text-lg select-none">
                       graphic_eq
                     </span>
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-sm text-white tracking-tight">
+                      <span className="font-bold text-sm text-foreground tracking-tight">
                         StreamVox Live
                       </span>
-                      <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-gradient-to-r from-[#fe2c55] to-[#25f4ee] text-black">
+                      <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-primary/15 text-primary border border-primary/25">
                         PRO
                       </span>
                     </div>
-                    <p className="text-[10px] text-slate-400">
+                    <p className="text-[10px] text-muted-foreground">
                       TikTok Live TTS Studio
                     </p>
                   </div>
@@ -239,8 +383,8 @@ export function Sidebar({
 
                 <button
                   type="button"
-                  onClick={onCloseMobile}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] border border-[#1e222d] transition-colors min-touch-target"
+                  onClick={handleCloseMobile}
+                  className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent border border-border transition-colors min-touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
                   aria-label="Close navigation menu"
                 >
                   <X className="w-5 h-5" />
@@ -248,30 +392,40 @@ export function Sidebar({
               </div>
 
               {/* Drawer Navigation Links */}
-              <nav className="flex flex-col gap-1.5" role="navigation">
+              <nav
+                className="flex flex-col gap-1.5"
+                role="navigation"
+                aria-label="Mobile Navigation"
+              >
                 {SIDEBAR_ITEMS.map((item) => {
                   const Icon = item.icon;
                   const isActive = activeTab === item.id;
+                  const showQueueBadge = item.id === "queue" && liveQueueCount > 0;
 
                   return (
                     <button
                       key={item.id}
                       type="button"
                       onClick={() => handleItemClick(item.id)}
-                      className={`flex items-center gap-3.5 px-3.5 py-3 rounded-xl transition-all text-left min-h-[48px] ${
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "flex items-center justify-between px-3.5 py-3 rounded-xl transition-all text-left min-h-[48px] min-touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background",
                         isActive
-                          ? "bg-gradient-to-r from-[#fe2c55]/20 to-[#25f4ee]/20 border border-white/20 text-white font-semibold shadow-md"
-                          : "text-slate-300 hover:text-white hover:bg-white/[0.05] font-normal"
-                      }`}
+                          ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent/60 font-medium"
+                      )}
                     >
-                      <Icon
-                        className={`w-5 h-5 shrink-0 ${
-                          isActive ? "text-neutral-900 dark:text-white" : "text-slate-400"
-                        }`}
-                      />
-                      <span className="text-sm font-medium tracking-tight">
-                        {item.label}
-                      </span>
+                      <div className="flex items-center gap-3.5">
+                        <Icon className="w-5 h-5 shrink-0" />
+                        <span className="text-sm font-medium tracking-tight">
+                          {item.label}
+                        </span>
+                      </div>
+                      {showQueueBadge && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground font-mono">
+                          {liveQueueCount}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -279,16 +433,16 @@ export function Sidebar({
             </div>
 
             {/* Mobile Drawer Footer */}
-            <div className="pt-4 border-t border-[#1e222d] text-xs text-slate-400">
-              <div className="p-3 rounded-xl bg-white/[0.03] border border-[#1e222d]">
-                <div className="font-semibold text-slate-200 text-xs mb-1">
+            <div className="pt-4 border-t border-border text-xs text-muted-foreground">
+              <div className="p-3 rounded-xl bg-muted/40 border border-border">
+                <div className="font-semibold text-foreground text-xs mb-1">
                   เสียงพากย์ต้นแบบ
                 </div>
-                <div className="text-[11px] text-slate-300">
-                  พิพัฒน์ บุญสิทธิเลิศ (Yuta Okkotsu)
+                <div className="text-[11px] text-foreground/80">
+                  คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
                 </div>
-                <div className="font-mono text-[10px] text-slate-500 mt-1.5">
-                  Platform: Apple &amp; Samsung Ready
+                <div className="font-mono text-[10px] text-muted-foreground mt-1.5">
+                  iOS Safari &amp; Samsung One UI Ready
                 </div>
               </div>
             </div>
@@ -298,3 +452,5 @@ export function Sidebar({
     </>
   );
 }
+
+export default Sidebar;

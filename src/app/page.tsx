@@ -66,9 +66,9 @@ function TikFinityDashboardContent() {
   const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
   const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
 
-  // Responsive Sidebar & Active Navigation state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  // Responsive Hybrid Sidebar & Active Navigation state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [sidebarMobileOpen, setSidebarMobileOpen] = useState<boolean>(false);
   const [activeNavTab, setActiveNavTab] = useState<string>("cockpit");
   const [settingsSubtab, setSettingsSubtab] = useState<SettingsTabId>("chat");
 
@@ -878,7 +878,7 @@ function TikFinityDashboardContent() {
   };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-[#0a0b0e] text-slate-100 flex flex-col font-sans selection:bg-[#fe2c55]/30 selection:text-white">
+    <div className="min-h-screen min-h-[100dvh] bg-background text-foreground flex flex-col font-sans selection:bg-primary/30 selection:text-foreground">
       {/* StreamVox Live Sticky Top Navigation Bar */}
       <Navbar
         username={username}
@@ -894,27 +894,31 @@ function TikFinityDashboardContent() {
         selectedVoiceId={selectedVoiceId}
         onOpenRoomModal={() => setShowRoomModal(true)}
         onSwitchAccount={() => setShowRoomModal(true)}
-        onToggleSidebar={() => {
-          if (typeof window !== "undefined" && window.innerWidth < 768) {
-            setIsMobileSidebarOpen((prev) => !prev);
-          } else {
-            setIsSidebarCollapsed((prev) => !prev);
-          }
-        }}
+        onToggleSidebar={() => setSidebarMobileOpen((prev) => !prev)}
+        isSidebarOpen={sidebarMobileOpen}
       />
 
       <div className="flex flex-1 w-full relative">
-        {/* StreamVox Live Responsive Hybrid Sidebar */}
+        {/* StreamVox Live Responsive Hybrid Collapsible Sidebar */}
         <Sidebar
-          isCollapsed={isSidebarCollapsed}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
           activeTab={activeNavTab}
+          onTabChange={handleSelectNavTab}
           onSelectTab={handleSelectNavTab}
-          isMobileOpen={isMobileSidebarOpen}
-          onCloseMobile={() => setIsMobileSidebarOpen(false)}
+          isMobileOpen={sidebarMobileOpen}
+          onMobileClose={() => setSidebarMobileOpen(false)}
+          onCloseMobile={() => setSidebarMobileOpen(false)}
+          liveQueueCount={queue.length}
+          isStreaming={isConnected}
         />
 
         {/* Main 2-Column Master Console Layout with Bento Grid & Safe Area Padding */}
-        <main className="flex-1 w-full min-w-0 p-3 sm:p-4 md:p-6 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))]">
+        <main
+          className={`flex-1 w-full min-w-0 transition-all duration-300 ${
+            sidebarCollapsed ? "md:ml-16" : "md:ml-64"
+          } ml-0 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))]`}
+        >
           <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-4 sm:gap-6 w-full">
             {/* Left Column: StreamVox & TikFinity Tabbed Settings Panel */}
             <div id="settings-section" className="w-full">

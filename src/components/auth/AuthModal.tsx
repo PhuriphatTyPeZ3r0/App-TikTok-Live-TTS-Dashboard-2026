@@ -1,32 +1,42 @@
 "use client";
 
 /**
- * Liquid Glass Authentication Dialog Modal for StreamVox Live.
+ * Authentication Dialog Modal for StreamVox Live Dashboard.
  *
- * Implements Apple visionOS dark design aesthetic:
- * - Tabbed navigation for Account Authentication (Sign In) and Registration (Sign Up)
- * - Single Sign-On (SSO) OAuth triggers for Google and TikTok
- * - Secure Electronic Mail (Email) and password authentication flows
- * - Resilient offline mode status banner when Supabase credentials are not configured
- * - Strict zero-emoji compliance across all visual indicators and error banners
+ * Adheres to:
+ * - Clean Minimal Enterprise Design System (DS) using Semantic HSL Design Tokens.
+ * - 100% Centered Modal Mandate via Grid Centering (`grid place-items-center`) within DialogContent primitive.
+ * - Web Content Accessibility Guidelines (WCAG) 2.1 Level AA focus trapping and Escape key dismissal.
+ * - Render Fast Application Programming Interface (FastAPI) Open Authorization (OAuth) 2.0 integration.
+ * - Role-Based Access Control (RBAC) Superadministrator local simulation mode.
+ * - Voice Actor Attribution: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert) - Master Thai Voice Model.
  *
  * Full Academic Terminology & Acronyms:
- * - Role-Based Access Control (RBAC)
- * - Row Level Security (RLS)
- * - Universally Unique Identifier (UUID)
  * - Single Sign-On (SSO)
+ * - Open Authorization (OAuth)
+ * - Role-Based Access Control (RBAC)
  * - Application Programming Interface (API)
+ * - Web Content Accessibility Guidelines (WCAG)
+ * - Single-Page Application (SPA)
+ * - Representational State Transfer (REST)
+ * - Uniform Resource Locator (URL)
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { X, AlertCircle, CheckCircle2, Loader2, Lock, Mail, User } from "lucide-react";
-import { useSupabaseAuth } from "../../hooks/useSupabaseAuth";
-import type { UserRole } from "../../types/auth";
-import { GoogleLoginButton } from "./GoogleLoginButton";
-import { TikTokLoginButton } from "./TikTokLoginButton";
+import { AlertCircle, CheckCircle2, Loader2, Lock, Mail, User, ShieldCheck, KeyRound } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useRenderAuth } from "@/hooks/useRenderAuth";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import type { UserRole } from "@/types/auth";
+import { cn } from "@/lib/utils";
+
+/** Base Uniform Resource Locator (URL) for backend API services. */
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://tiktok-live-tts-bot.onrender.com";
 
 /**
- * Properties for AuthModal dialog.
+ * Properties for AuthModal component.
  */
 export interface AuthModalProps {
   /** Controls visibility of the authentication dialog overlay. */
@@ -38,20 +48,15 @@ export interface AuthModalProps {
 }
 
 /**
- * Apple visionOS Liquid Glass dark modal for user authentication and Role-Based Access Control (RBAC).
+ * Clean Minimal Enterprise Authentication Dialog for StreamVox Live.
  */
 export function AuthModal({
   isOpen,
   onClose,
   defaultTab = "signin",
-}: AuthModalProps): React.JSX.Element | null {
-  const {
-    isConfigured,
-    signInWithPassword,
-    signUp,
-    signInWithGoogle,
-    signInWithTikTok,
-  } = useSupabaseAuth();
+}: AuthModalProps): React.JSX.Element {
+  const { loginWithGoogle, mockLogin } = useRenderAuth();
+  const { isConfigured, signInWithPassword, signUp } = useSupabaseAuth();
 
   const [activeTab, setActiveTab] = useState<"signin" | "signup">(defaultTab);
   const [email, setEmail] = useState<string>("");
@@ -64,6 +69,7 @@ export function AuthModal({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Clear timers on component dismount
   useEffect(() => {
     return () => {
       if (closeTimerRef.current) {
@@ -72,6 +78,7 @@ export function AuthModal({
     };
   }, []);
 
+  // Reset alert states upon modal invocation
   useEffect(() => {
     if (isOpen) {
       setErrorMessage(null);
@@ -81,35 +88,51 @@ export function AuthModal({
     }
   }, [isOpen]);
 
-  // Sync tab state when defaultTab changes
+  // Synchronize active tab with initial property specification
   useEffect(() => {
     setActiveTab(defaultTab);
   }, [defaultTab]);
 
-  // Clear messages and input errors when switching tabs
   const handleTabChange = (tab: "signin" | "signup") => {
     setActiveTab(tab);
     setErrorMessage(null);
     setSuccessMessage(null);
   };
 
-  // Close modal on Escape key press
-  useEffect(() => {
-    if (!isOpen) return;
+  // Google Single Sign-On (SSO) OAuth dispatcher via useRenderAuth
+  const handleGoogleLogin = () => {
+    setErrorMessage(null);
+    setOauthLoading("google");
+    try {
+      loginWithGoogle();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to initiate Google OAuth flow.";
+      setErrorMessage(msg);
+      setOauthLoading(null);
+    }
+  };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
+  // TikTok Single Sign-On (SSO) OAuth dispatcher via Render FastAPI
+  const handleTikTokLogin = () => {
+    setErrorMessage(null);
+    setOauthLoading("tiktok");
+    if (typeof window !== "undefined") {
+      window.location.href = `${API_BASE_URL}/api/auth/tiktok/login`;
+    }
+  };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+  // Local development mock authentication for offline administrator verification
+  const handleAdminMockLogin = () => {
+    setErrorMessage(null);
+    mockLogin("admin");
+    setSuccessMessage("Authenticated as Superadministrator (phuriphathem@gmail.com).");
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => {
+      onClose();
+    }, 600);
+  };
 
-  // Handle standard Email/Password submission
+  // Standard Electronic Mail (Email) and password authentication handler
   const handleSubmit = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
@@ -117,12 +140,12 @@ export function AuthModal({
       setSuccessMessage(null);
 
       if (!email.trim() || !password) {
-        setErrorMessage("Please provide both email address and password.");
+        setErrorMessage("Please provide both electronic mail address and password.");
         return;
       }
 
       if (password.length < 6) {
-        setErrorMessage("Password must be at least 6 characters long.");
+        setErrorMessage("Password must be at least 6 characters in length.");
         return;
       }
 
@@ -161,7 +184,7 @@ export function AuthModal({
             setErrorMessage(error.message);
           } else {
             setSuccessMessage(
-              "Account registered successfully. If email verification is enabled, please verify your email."
+              "Account registered successfully. If electronic mail verification is enabled, please verify your inbox."
             );
             if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
             closeTimerRef.current = setTimeout(() => {
@@ -179,176 +202,215 @@ export function AuthModal({
     [activeTab, email, password, displayName, selectedRole, signInWithPassword, signUp, onClose]
   );
 
-  // Handle Google OAuth Single Sign-On (SSO)
-  const handleGoogleLogin = async () => {
-    setErrorMessage(null);
-    setOauthLoading("google");
-    const { error } = await signInWithGoogle();
-    if (error) {
-      setErrorMessage(error.message);
-      setOauthLoading(null);
-    }
-  };
-
-  // Handle TikTok OAuth Single Sign-On (SSO)
-  const handleTikTokLogin = async () => {
-    setErrorMessage(null);
-    setOauthLoading("tiktok");
-    const { error } = await signInWithTikTok();
-    if (error) {
-      setErrorMessage(error.message);
-      setOauthLoading(null);
-    }
-  };
-
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md transition-opacity overflow-y-auto"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="auth-modal-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <div className="relative w-full max-w-md my-auto bg-[#12141a]/95 border border-[#1e222d] hover:border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-5 sm:p-7 backdrop-blur-2xl text-slate-100 transition-all modal-center-animate max-h-[calc(100dvh-2rem)] overflow-y-auto">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-[#1e222d]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center text-black font-extrabold text-sm select-none shadow-md">
-              <span className="material-symbols-rounded text-base select-none">
-                lock
-              </span>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        onClose={onClose}
+        className="w-full max-w-md p-6 bg-card text-card-foreground border border-border rounded-lg shadow-lg max-h-[90dvh] overflow-y-auto space-y-4"
+      >
+        {/* Accessible Dialog Header */}
+        <DialogHeader className="text-left pb-3 border-b border-border/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-md bg-primary/10 text-primary border border-primary/20 flex items-center justify-center shrink-0">
+              <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h2 id="auth-modal-title" className="text-base font-bold tracking-tight text-white">
+              <DialogTitle className="text-base font-semibold text-foreground">
                 StreamVox Account
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                Supabase Authentication &amp; Role-Based Access Control (RBAC)
-              </p>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Single Sign-On (SSO) &amp; Role-Based Access Control (RBAC)
+              </DialogDescription>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] transition-colors"
-            aria-label="Close dialog"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+        </DialogHeader>
 
-        {/* Unconfigured Supabase Notice */}
+        {/* Local Offline Supabase Notification */}
         {!isConfigured && (
-          <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-start gap-2.5 text-xs text-amber-200">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="p-3 rounded-md bg-muted/60 border border-border text-xs text-muted-foreground flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold block">Local Offline Mode Active</span>
-              Supabase environment keys are not configured. The dashboard continues operating locally with full broadcaster permissions.
+              <span className="font-semibold text-foreground block">Local Offline Mode Active</span>
+              Supabase cloud credentials are unconfigured. The dashboard functions in autonomous offline broadcaster mode.
             </div>
           </div>
         )}
 
-        {/* Tab Switcher */}
-        <div className="flex p-1 mt-4 rounded-xl bg-[#0a0b0e] border border-[#1e222d]">
-          <button
+        {/* Tab Navigation Controls */}
+        <div className="grid grid-cols-2 gap-1 p-1 rounded-md bg-muted text-muted-foreground">
+          <Button
             type="button"
-            onClick={() => handleTabChange("signin")}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all select-none ${
+            variant={activeTab === "signin" ? "default" : "ghost"}
+            size="sm"
+            className={cn(
+              "w-full text-xs font-semibold min-h-[36px]",
               activeTab === "signin"
-                ? "bg-[#181b24] text-white shadow-sm border border-white/10"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
+                ? "bg-background text-foreground shadow-xs hover:bg-background"
+                : "hover:bg-background/50 hover:text-foreground"
+            )}
+            onClick={() => handleTabChange("signin")}
           >
             Sign In
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            onClick={() => handleTabChange("signup")}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all select-none ${
+            variant={activeTab === "signup" ? "default" : "ghost"}
+            size="sm"
+            className={cn(
+              "w-full text-xs font-semibold min-h-[36px]",
               activeTab === "signup"
-                ? "bg-[#181b24] text-white shadow-sm border border-white/10"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
+                ? "bg-background text-foreground shadow-xs hover:bg-background"
+                : "hover:bg-background/50 hover:text-foreground"
+            )}
+            onClick={() => handleTabChange("signup")}
           >
             Create Account
-          </button>
+          </Button>
         </div>
 
-        {/* Status and Error Alerts */}
+        {/* Error Feedback Message */}
         {errorMessage && (
-          <div className="mt-4 p-3 rounded-xl bg-[#fe2c55]/15 border border-[#fe2c55]/30 flex items-start gap-2.5 text-xs text-[#fe2c55]">
+          <div className="p-3 rounded-md bg-destructive/10 border border-destructive/30 text-xs text-destructive flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
           </div>
         )}
 
+        {/* Success Feedback Message */}
         {successMessage && (
-          <div className="mt-4 p-3 rounded-xl bg-[#00e676]/15 border border-[#00e676]/30 flex items-start gap-2.5 text-xs text-[#00e676]">
+          <div className="p-3 rounded-md bg-primary/10 border border-primary/30 text-xs text-primary flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{successMessage}</span>
           </div>
         )}
 
-        {/* Single Sign-On (SSO) OAuth Section */}
-        <div className="mt-4 space-y-2">
-          <GoogleLoginButton
+        {/* Single Sign-On (SSO) OAuth Triggers */}
+        <div className="space-y-2">
+          {/* Google OAuth Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
+            disabled={submitting || oauthLoading !== null}
             onClick={handleGoogleLogin}
-            loading={oauthLoading === "google"}
+            aria-label="Continue with Google Single Sign-On (SSO)"
+            className="w-full h-11 min-h-[44px] flex items-center justify-center gap-3 font-medium border-border hover:bg-accent hover:text-accent-foreground"
+          >
+            {oauthLoading === "google" ? (
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            ) : (
+              <svg
+                className="w-4 h-4 shrink-0"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                  fill="#EA4335"
+                />
+              </svg>
+            )}
+            <span>Continue with Google</span>
+          </Button>
+
+          {/* TikTok OAuth Button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="default"
             disabled={submitting || oauthLoading !== null}
-            label="Continue with Google SSO"
-          />
-          <TikTokLoginButton
             onClick={handleTikTokLogin}
-            loading={oauthLoading === "tiktok"}
-            disabled={submitting || oauthLoading !== null}
-            label="Continue with TikTok SSO"
-          />
+            aria-label="Continue with TikTok Single Sign-On (SSO)"
+            className="w-full h-11 min-h-[44px] flex items-center justify-center gap-3 font-medium border-border hover:bg-accent hover:text-accent-foreground"
+          >
+            {oauthLoading === "tiktok" ? (
+              <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            ) : (
+              <svg
+                className="w-4 h-4 shrink-0 fill-current"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.29 0 .58.04.85.11V9.33a6.33 6.33 0 0 0-.85-.06A6.34 6.34 0 0 0 3.14 15.6a6.34 6.34 0 0 0 6.34 6.34 6.33 6.33 0 0 0 6.34-6.34V8.58a8.28 8.28 0 0 0 4.77 1.5V6.69h-1z" />
+              </svg>
+            )}
+            <span>Continue with TikTok</span>
+          </Button>
         </div>
 
-        {/* Visual Divider */}
-        <div className="relative my-4 flex items-center justify-center">
-          <div className="w-full border-t border-[#1e222d]" />
-          <span className="absolute px-3 bg-[#12141a] text-[10px] uppercase tracking-wider text-slate-500 font-medium">
-            Or continue with email
+        {/* Local Development / Mock Administrator Mode */}
+        <div className="p-3 rounded-md bg-muted/40 border border-border/70 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <ShieldCheck className="w-4 h-4 text-primary" />
+              <span>Local Dev / Testing Mode</span>
+            </div>
+            <Badge variant="admin">Admin Bypass</Badge>
+          </div>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Simulate Superadministrator privilege (phuriphathem@gmail.com) for instantaneous Role-Based Access Control (RBAC) diagnostics without Google credentials.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="default"
+            className="w-full h-11 min-h-[44px] text-xs font-semibold justify-center gap-2"
+            onClick={handleAdminMockLogin}
+          >
+            <KeyRound className="w-4 h-4" />
+            <span>Continue as Admin (phuriphathem@gmail.com)</span>
+          </Button>
+        </div>
+
+        {/* Visual Boundary Divider */}
+        <div className="relative my-3 flex items-center justify-center">
+          <div className="w-full border-t border-border" />
+          <span className="absolute px-2 bg-card text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+            Or continue with electronic mail
           </span>
         </div>
 
-        {/* Email & Password Form */}
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        {/* Electronic Mail & Password Form */}
+        <form onSubmit={handleSubmit} className="space-y-3">
           {activeTab === "signup" && (
             <>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-foreground">
                   Display Name or Live Handle
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                   <input
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="e.g. phuriphat_live"
-                    className="w-full pl-9 pr-3 py-2 bg-[#0a0b0e] border border-[#1e222d] focus:border-[#25f4ee] rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none transition-colors"
+                    className="w-full pl-9 pr-3 h-10 bg-background border border-input rounded-md text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background transition-colors"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-medium text-foreground">
                   Role-Based Access Control (RBAC) Role
                 </label>
                 <select
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 bg-[#0a0b0e] border border-[#1e222d] focus:border-[#25f4ee] rounded-xl text-xs text-white focus:outline-none transition-colors"
+                  className="w-full px-3 h-10 bg-background border border-input rounded-md text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background transition-colors"
                 >
                   <option value="streamer">Streamer (Broadcaster Controls &amp; Cloud Tuning)</option>
                   <option value="viewer">Viewer (Read-Only Overlay Observer)</option>
@@ -358,57 +420,59 @@ export function AuthModal({
             </>
           )}
 
-          <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1">
+          <div className="space-y-1">
+            <label className="block text-[11px] font-medium text-foreground">
               Electronic Mail (Email)
             </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="streamer@streamvox.live"
-                className="w-full pl-9 pr-3 py-2 bg-[#0a0b0e] border border-[#1e222d] focus:border-[#25f4ee] rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none transition-colors"
+                className="w-full pl-9 pr-3 h-10 bg-background border border-input rounded-md text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background transition-colors"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-medium text-slate-300 mb-1">
+          <div className="space-y-1">
+            <label className="block text-[11px] font-medium text-foreground">
               Password
             </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <input
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2 bg-[#0a0b0e] border border-[#1e222d] focus:border-[#25f4ee] rounded-xl text-xs text-white placeholder-slate-600 focus:outline-none transition-colors"
+                className="w-full pl-9 pr-3 h-10 bg-background border border-input rounded-md text-xs text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background transition-colors"
               />
             </div>
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="default"
+            size="default"
             disabled={submitting || oauthLoading !== null}
-            className="w-full py-2.5 px-4 rounded-xl text-xs sm:text-sm font-semibold text-black bg-gradient-to-r from-[#fe2c55] to-[#25f4ee] hover:brightness-110 active:scale-[0.99] transition-all duration-150 flex items-center justify-center gap-2 shadow-md disabled:opacity-50 disabled:pointer-events-none mt-2"
+            className="w-full h-11 min-h-[44px] font-semibold text-xs sm:text-sm shadow-sm mt-1"
           >
             {submitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin text-black" />
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 <span>Processing...</span>
               </>
             ) : (
               <span>{activeTab === "signin" ? "Sign In to StreamVox" : "Complete Registration"}</span>
             )}
-          </button>
+          </Button>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

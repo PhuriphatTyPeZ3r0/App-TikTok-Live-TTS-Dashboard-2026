@@ -62,3 +62,46 @@ export interface AuthCredentials {
   password: string;
   displayName?: string;
 }
+
+/**
+ * Render Backend authenticated user entity representing an Open Authorization (OAuth) account.
+ */
+export interface RenderUser {
+  /** Universally Unique Identifier (UUID) or backend account identity string. */
+  id: string;
+  /** Primary electronic mail address. */
+  email: string;
+  /** Full display name extracted from Open Authorization (OAuth) provider. */
+  name?: string;
+  /** Public Uniform Resource Locator (URL) for user profile avatar. */
+  avatar_url?: string;
+  /** Role-Based Access Control (RBAC) role assigned in backend database. */
+  role: "admin" | "streamer";
+  /** ISO 8601 creation timestamp. */
+  created_at?: string;
+}
+
+/**
+ * Render Backend Native Open Authorization (OAuth) state lifecycle contract.
+ */
+export interface RenderAuthState {
+  /** Authenticated user details or null when guest/unauthenticated. */
+  user: RenderUser | null;
+  /** JSON Web Token (JWT) bearer access token. */
+  token: string | null;
+  /** Active Role-Based Access Control (RBAC) role. */
+  role: "admin" | "streamer" | null;
+  /** High-privilege administrative access flag. */
+  isAdmin: boolean;
+  /** Authentication verification or network roundtrip loading status. */
+  isLoading: boolean;
+  /** Human-readable error message if authentication failed. */
+  error: string | null;
+  /** Initiate Google Open Authorization (OAuth) redirection workflow. */
+  loginWithGoogle: () => void;
+  /** Purge authentication credentials, terminate session, and reset local state. */
+  logout: () => void;
+  /** Developer mode fallback mock login simulator. */
+  mockLogin: (role?: "admin" | "streamer") => void;
+}
+
