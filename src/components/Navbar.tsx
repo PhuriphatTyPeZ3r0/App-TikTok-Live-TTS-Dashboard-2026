@@ -3,19 +3,18 @@
 /**
  * StreamVox Live Master Navigation Bar Component for Next.js 15.
  *
- * Implements Clean Minimal Enterprise Design System (DS) & Web Content Accessibility Guidelines (WCAG) 2.1 AA:
- * - Brand logo with Google Material Symbols (`graphic_eq`)
- * - Responsive mobile hamburger drawer toggle button (`Menu`) with touch target >= 44x44px (`md:hidden`)
- * - Title: "StreamVox Live" with `v2.1 PRO` status badge
- * - Subtitle: "TikTok Live Text-to-Speech (TTS) Studio • PyThaiNLP & Multi-Voice Powered"
- * - Status indicators:
- *     - LIVE badge with pulsing indicator: `LIVE: @{username || 'phuriphat_live'}`
- *     - Active Voice profile indicator: `record_voice_over {activeEngine}`
- * - Quick Voice Test button with Google Material Symbols (`volume_up`) and loading indicator
- * - Text-to-Speech (TTS) Master toggle switch (`masterTtsEnabled` / `onToggleMaster`)
- * - Touch targets >= 44x44px for optimal mobile ergonomics across iOS and Android
- * - Safe area top padding for Dynamic Island and hardware camera cutouts
- * - Zero Hardcoded Colors: Uses semantic tokens (`bg-background/85`, `border-border`, etc.)
+ * Implements Flowbite Modern Enterprise Design System (DS) & Web Content Accessibility Guidelines (WCAG) 2.1 AA:
+ * - Direct integration with global DashboardContext (`useDashboard()`)
+ * - Dynamic route breadcrumb navigation powered by Next.js App Router (`usePathname()`)
+ * - Responsive mobile off-canvas drawer toggle button (`min-h-[44px] min-w-[44px]`)
+ * - TikTok Room Switcher Chip with pulsing live indicator dot triggering room modal (`setShowRoomModal(true)`)
+ * - High-visibility Master Text-to-Speech (TTS) toggle button with radiant emerald/rose state glow
+ * - Quick Voice Test trigger button (`testVoice()`) featuring speaker icon
+ * - Inline volume slider and mute toggle synchronizing with TikFinity configuration (`settings.volume`)
+ * - Embedded Role-Based Access Control (RBAC) user profile button (`UserProfileButton`)
+ * - Zero verbose descriptive paragraphs: strictly minimal, high-density Flowbite enterprise interface
+ * - Touch targets >= 44x44px adhering to WCAG 2.1 Level AA mobile ergonomics
+ * - Semantic design tokens with complete dark/light cinema mode adaptability
  *
  * Full Academic Terminology & Acronyms:
  * - User Interface (UI)
@@ -24,26 +23,77 @@
  * - Web Content Accessibility Guidelines (WCAG)
  * - Single-Page Application (SPA)
  * - Asynchronous Server Gateway Interface (ASGI)
+ * - First-In, First-Out (FIFO)
  * - Open Broadcaster Software (OBS)
  * - Text-to-Speech (TTS)
- * - Application Programming Interface (API)
  * - Role-Based Access Control (RBAC)
+ * - Application Programming Interface (API)
  *
- * Voice Actor Attribution:
- * - Dedicated to Master Voice Actor: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert).
+ * Master Thai Voice Actor Attribution:
+ * - Dedicated to Master Thai Voice Actor: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert).
  */
 
-import React, { useState } from "react";
-import { Loader2, Sun, Moon, User, Menu } from "lucide-react";
+import React, { useState, useRef, useCallback } from "react";
+import { usePathname } from "next/navigation";
+import {
+  Loader2,
+  Sun,
+  Moon,
+  Volume2,
+  Volume1,
+  VolumeX,
+  ChevronRight,
+  Radio,
+} from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { useDashboard, type DashboardContextType } from "../context/DashboardContext";
 import { UserProfileButton } from "./auth/UserProfileButton";
 import { AuthModal } from "./auth/AuthModal";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { cn } from "@/lib/utils";
 
+/**
+ * Route-to-Breadcrumb label dictionary.
+ * Maps Next.js 15 App Router uniform resource identifier (URI) paths to human-readable workspace section names.
+ */
+export const ROUTE_BREADCRUMBS: Record<string, string> = {
+  "/": "Cockpit",
+  "/queue": "FIFO Queue",
+  "/voice": "Voice Studio",
+  "/settings": "Chat TTS",
+  "/gift": "Gift Alerts",
+  "/safety": "Safety & Filters",
+  "/obs": "OBS Studio",
+  "/logs": "Broadcast Logs",
+};
+
+/**
+ * Resolves the dynamic breadcrumb label based on active Uniform Resource Identifier (URI) pathname.
+ *
+ * @param pathname - Current Next.js App Router pathname string
+ * @returns Human-readable workspace section label (defaults to "Cockpit")
+ */
+export function getBreadcrumbTitle(pathname?: string | null): string {
+  if (!pathname) return "Cockpit";
+  const clean = pathname.split("?")[0].replace(/\/+$/, "") || "/";
+  return ROUTE_BREADCRUMBS[clean] || ROUTE_BREADCRUMBS[pathname] || "Cockpit";
+}
+
+/**
+ * Safe consumer wrapper for useDashboard hook to prevent uncaught exceptions
+ * when rendered in isolated test harnesses without a parent DashboardProvider.
+ */
+function useDashboardSafe(): DashboardContextType | null {
+  try {
+    return useDashboard();
+  } catch {
+    return null;
+  }
+}
+
 export interface NavbarProps {
-  /** Optional TikTok creator handle (e.g., @phuriphat_live). Defaults to @phuriphat_live. */
+  /** Optional TikTok creator handle override (e.g. @phuriphat_live). */
   username?: string;
   /** Whether the WebSocket (WS) connection to the ASGI server is active. */
   isConnected?: boolean;
@@ -57,7 +107,7 @@ export interface NavbarProps {
   overlayToken?: string;
   /** Whether Open Broadcaster Software (OBS) client is connected. */
   obsConnected?: boolean;
-  /** Master TTS switch state. */
+  /** Master TTS switch state override. */
   masterTtsEnabled?: boolean;
   /** Callback when Master TTS switch is toggled. */
   onToggleMaster?: (enabled: boolean) => void;
@@ -81,202 +131,326 @@ export interface NavbarProps {
   isSidebarOpen?: boolean;
   /** Callback to trigger authentication modal dialog. */
   onOpenAuthModal?: () => void;
-  /** Optional custom className */
+  /** Optional explicit pathname override for SSR, unit tests or custom route display. */
+  pathname?: string;
+  /** Optional custom CSS className. */
   className?: string;
 }
 
-const VOICE_BADGE_LABELS: Record<string, string> = {
-  yuta: "พิพัฒน์ บุญสิทธิเลิศ (Yuta • Fish Audio)",
-  hana: "ฮานะ (Hana Sweet • Fish Audio)",
-  joker: "ดีเจโจ๊กเกอร์ (DJ Joker • Fish Audio)",
-  anchor: "ผู้ประกาศข่าว ชาย (News Anchor • Fish Audio)",
-  niwat: "นิวัฒน์ (Niwat Neural • Edge-TTS)",
-};
-
 export function Navbar({
-  username = "phuriphat_live",
-  isConnected = false,
-  isReconnecting = false,
-  backendUrl = "",
-  sessionId = "",
+  username: usernameProp,
+  isConnected,
+  isReconnecting,
+  backendUrl,
+  sessionId,
   overlayToken,
-  obsConnected = false,
-  masterTtsEnabled = true,
+  obsConnected,
+  masterTtsEnabled: masterTtsProp,
   onToggleMaster,
   onTestVoice,
-  isTestingVoice = false,
+  isTestingVoice: isTestingVoiceProp,
   activeEngine,
-  selectedVoiceId = "yuta",
+  selectedVoiceId,
   onOpenRoomModal,
   onSwitchAccount,
   onOpenOBSPreview,
   onToggleSidebar,
-  isSidebarOpen = false,
+  isSidebarOpen: isSidebarOpenProp,
   onOpenAuthModal,
+  pathname: pathnameProp,
   className = "",
 }: NavbarProps): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
+  const dashboard = useDashboardSafe();
   const [authModalOpen, setAuthModalOpen] = useState<boolean>(false);
 
-  // Clean creator handle for display
-  const displayUser = username.replace(/^@/, "").trim() || "phuriphat_live";
+  // Pathname resolution with App Router fallback
+  let hookPathname: string | null = null;
+  try {
+    hookPathname = usePathname();
+  } catch {
+    hookPathname = null;
+  }
+  const currentPath = pathnameProp ?? hookPathname ?? "/";
+  const activeBreadcrumb = getBreadcrumbTitle(currentPath);
 
-  const resolvedEngineLabel =
-    activeEngine ||
-    VOICE_BADGE_LABELS[selectedVoiceId] ||
-    "Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ)";
+  // Extract reactive properties from DashboardContext with prop fallbacks
+  const rawUsername = usernameProp ?? dashboard?.username ?? "phuriphat_live";
+  const cleanUsername = rawUsername.replace(/^@/, "").trim() || "phuriphat_live";
+
+  const masterTtsEnabled = masterTtsProp ?? dashboard?.masterTtsEnabled ?? true;
+  const isTestingVoice = isTestingVoiceProp ?? dashboard?.isTestingVoice ?? false;
+  const sidebarMobileOpen = isSidebarOpenProp ?? dashboard?.sidebarMobileOpen ?? false;
+
+  const currentVolume =
+    typeof dashboard?.settings?.volume === "number"
+      ? dashboard.settings.volume
+      : 1.0;
+  const isMuted = currentVolume <= 0.01;
+  const prevVolumeRef = useRef<number>(currentVolume > 0.05 ? currentVolume : 1.0);
+
+  // Action Dispatches
+  const handleToggleSidebar = useCallback(() => {
+    if (dashboard?.setSidebarMobileOpen) {
+      dashboard.setSidebarMobileOpen((prev) => !prev);
+    }
+    onToggleSidebar?.();
+  }, [dashboard, onToggleSidebar]);
+
+  const handleRoomClick = useCallback(() => {
+    if (dashboard?.setShowRoomModal) {
+      dashboard.setShowRoomModal(true);
+    }
+    onOpenRoomModal?.();
+    onSwitchAccount?.();
+  }, [dashboard, onOpenRoomModal, onSwitchAccount]);
+
+  const handleToggleMaster = useCallback(() => {
+    const nextVal = !masterTtsEnabled;
+    if (dashboard?.setMasterTtsEnabled) {
+      dashboard.setMasterTtsEnabled(nextVal);
+    }
+    onToggleMaster?.(nextVal);
+  }, [dashboard, masterTtsEnabled, onToggleMaster]);
+
+  const handleTestVoice = useCallback(() => {
+    if (dashboard?.testVoice) {
+      dashboard.testVoice();
+    }
+    onTestVoice?.();
+  }, [dashboard, onTestVoice]);
+
+  const handleVolumeChange = useCallback(
+    (newVolume: number) => {
+      const clamped = Math.max(0, Math.min(1, newVolume));
+      if (clamped > 0.05) {
+        prevVolumeRef.current = clamped;
+      }
+      if (dashboard?.updateSettings) {
+        dashboard.updateSettings({ volume: clamped });
+      }
+    },
+    [dashboard]
+  );
+
+  const toggleMute = useCallback(() => {
+    if (isMuted) {
+      const restored = prevVolumeRef.current > 0.05 ? prevVolumeRef.current : 1.0;
+      handleVolumeChange(restored);
+    } else {
+      prevVolumeRef.current = currentVolume;
+      handleVolumeChange(0);
+    }
+  }, [isMuted, currentVolume, handleVolumeChange]);
 
   return (
     <header
       className={cn(
-        "sticky top-0 z-30 w-full bg-background/85 backdrop-blur-md border-b border-border px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))] shadow-xs flex items-center justify-between gap-2.5 sm:gap-4 transition-colors",
+        "sticky top-0 z-30 w-full bg-background/85 backdrop-blur-md border-b border-border px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] shadow-xs flex items-center justify-between gap-2.5 sm:gap-4 transition-colors",
         className
       )}
       aria-label="StreamVox Live Master Navigation Bar"
     >
-      {/* Left Section: Flowbite Mobile Hamburger, Brand Logo & Title */}
+      {/* Left Section: Mobile Hamburger, Brand Emblem & Dynamic Route Breadcrumb */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Responsive Mobile Drawer Menu Toggle (Flowbite Standard: inline-flex sm:hidden) */}
-        {onToggleSidebar && (
-          <button
-            data-drawer-target="logo-sidebar"
-            data-drawer-toggle="logo-sidebar"
-            aria-controls="logo-sidebar"
-            type="button"
-            onClick={onToggleSidebar}
-            aria-expanded={isSidebarOpen}
-            className="text-foreground bg-transparent border border-border hover:bg-accent focus:ring-2 focus:ring-ring font-medium rounded-lg text-sm p-2 focus:outline-none inline-flex sm:hidden min-h-[44px] min-w-[44px] items-center justify-center shrink-0 min-touch-target"
-            aria-label="Open sidebar"
-            title="เปิดแถบเมนู (Open sidebar)"
+        <button
+          type="button"
+          onClick={handleToggleSidebar}
+          aria-expanded={sidebarMobileOpen}
+          aria-controls="logo-sidebar"
+          className="text-foreground bg-transparent border border-border hover:bg-accent focus:ring-2 focus:ring-ring font-medium rounded-lg text-sm p-2 focus:outline-none inline-flex sm:hidden min-h-[44px] min-w-[44px] items-center justify-center shrink-0 min-touch-target"
+          aria-label="Open sidebar"
+          title="Open navigation menu (Open sidebar)"
+        >
+          <span className="sr-only">Open sidebar</span>
+          <svg
+            className="w-6 h-6"
+            aria-hidden="true"
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            fill="none"
+            viewBox="0 0 24 24"
           >
-            <span className="sr-only">Open sidebar</span>
-            <svg
-              className="w-6 h-6"
-              aria-hidden="true"
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeWidth="2"
-                d="M5 7h14M5 12h14M5 17h10"
-              />
-            </svg>
-          </button>
-        )}
+            <path
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeWidth="2"
+              d="M5 7h14M5 12h14M5 17h10"
+            />
+          </svg>
+        </button>
 
-        {/* Brand Icon Box (Touch target >= 44x44px, triggers onToggleSidebar if desktop drawer) */}
+        {/* Brand Logo Box (Touch target >= 44x44px) */}
         <div
           role="button"
           tabIndex={0}
-          onClick={onToggleSidebar}
+          onClick={handleToggleSidebar}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
-              onToggleSidebar?.();
+              handleToggleSidebar();
             }
           }}
           className="h-11 w-11 min-h-[44px] min-w-[44px] rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-extrabold text-lg select-none shadow-xs shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
           title="StreamVox Live TTS Console (Toggle Sidebar)"
           aria-label="StreamVox Live TTS Console"
         >
-          <span className="material-symbols-rounded text-xl select-none">
-            graphic_eq
-          </span>
+          <Radio className="w-5 h-5 select-none" aria-hidden="true" />
         </div>
 
-        {/* Brand Title and Subtitle */}
-        <div className="flex flex-col">
-          <div className="flex items-center gap-2">
-            <h1 className="font-bold text-sm sm:text-base tracking-tight text-foreground">
-              StreamVox Live
-            </h1>
-            <Badge
-              variant="outline"
-              className="text-[10px] font-mono py-0 px-2 font-bold tracking-wider"
-            >
-              v2.1 PRO
-            </Badge>
-          </div>
+        {/* Brand Title and Product Tier */}
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-sm sm:text-base tracking-tight text-foreground select-none">
+            StreamVox
+          </span>
+          <Badge
+            variant="outline"
+            className="text-[10px] font-mono py-0 px-1.5 font-bold tracking-wider hidden xs:inline-flex"
+          >
+            PRO
+          </Badge>
         </div>
+
+        {/* Dynamic Route Breadcrumb (Flowbite Minimal Standard) */}
+        <nav
+          className="flex items-center text-sm font-medium text-muted-foreground ml-1 sm:ml-2"
+          aria-label="Breadcrumb"
+        >
+          <ol className="inline-flex items-center space-x-1 sm:space-x-1.5">
+            <li className="inline-flex items-center">
+              <ChevronRight
+                className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0"
+                aria-hidden="true"
+              />
+            </li>
+            <li className="inline-flex items-center">
+              <span
+                className="text-xs font-semibold text-foreground bg-secondary/80 border border-border px-2 py-0.5 rounded-md whitespace-nowrap"
+                data-testid="navbar-breadcrumb"
+              >
+                {activeBreadcrumb}
+              </span>
+            </li>
+          </ol>
+        </nav>
       </div>
 
-      {/* Right Section: Badges, Controls, TTS Master Switch & Profile */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
-        {/* Live Badge with Pulsing Dot */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={onSwitchAccount || onOpenRoomModal}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              (onSwitchAccount || onOpenRoomModal)?.();
-            }
-          }}
-          className="flex items-center gap-2 bg-destructive/15 border border-destructive/30 px-3.5 py-1.5 rounded-full text-xs font-semibold text-destructive shadow-xs cursor-pointer hover:bg-destructive/25 transition-colors h-11 min-h-[44px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
-          title={`TikTok Live: @${displayUser} (คลิกเพื่อเปลี่ยนห้อง)`}
-          aria-label={`TikTok Live: @${displayUser}`}
+      {/* Right Section: Room Switcher, Master TTS Toggle, Quick Voice Test, Volume & SSO Profile */}
+      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 flex-wrap justify-end">
+        {/* TikTok Room Switcher Chip (Pulsing live dot, min-h-[44px]) */}
+        <button
+          type="button"
+          onClick={handleRoomClick}
+          className="flex items-center gap-2 bg-card/60 border border-border hover:border-emerald-500/50 hover:bg-emerald-500/10 px-3.5 py-1.5 rounded-full text-xs font-semibold text-foreground transition-all h-11 min-h-[44px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:scale-[0.98]"
+          title={`TikTok Live Room: @${cleanUsername} (Click to change room)`}
+          aria-label={`TikTok Live Room: @${cleanUsername} (Click to change room)`}
         >
-          <span className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse" />
-          <span className="truncate max-w-[110px] sm:max-w-[180px]">
-            LIVE: @{displayUser}
+          <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
           </span>
-        </div>
+          <span className="truncate max-w-[100px] sm:max-w-[150px] font-medium">
+            @{cleanUsername}
+          </span>
+        </button>
 
-        {/* Voice Engine Badge (hidden on mobile/tablet, visible on desktop >= xl) */}
-        <div
-          className="hidden xl:flex items-center gap-2 bg-secondary border border-border px-3.5 py-1.5 rounded-full text-xs font-semibold text-secondary-foreground shadow-xs h-11 min-h-[44px] select-none"
-          title={`Active Voice Engine: ${resolvedEngineLabel}`}
+        {/* Master TTS Toggle Button (High-visibility radiant glow: Emerald when ON, Rose when OFF) */}
+        <button
+          type="button"
+          onClick={handleToggleMaster}
+          aria-pressed={masterTtsEnabled}
+          className={cn(
+            "flex items-center gap-2 px-3 py-1.5 rounded-lg border font-semibold text-xs h-11 min-h-[44px] transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:scale-[0.98]",
+            masterTtsEnabled
+              ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] hover:bg-emerald-500/25"
+              : "bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.35)] hover:bg-rose-500/25"
+          )}
+          title={
+            masterTtsEnabled
+              ? "Master TTS is Active (Click to disable speech output)"
+              : "Master TTS is Disabled (Click to enable speech output)"
+          }
+          aria-label={masterTtsEnabled ? "Disable Master TTS" : "Enable Master TTS"}
         >
-          <span className="material-symbols-rounded text-base select-none text-primary">
-            record_voice_over
-          </span>
-          <span className="truncate max-w-[220px]">{resolvedEngineLabel}</span>
-        </div>
-
-        {/* Quick Voice Test Button */}
-        {onTestVoice && (
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            onClick={onTestVoice}
-            disabled={isTestingVoice}
-            className="h-11 min-h-[44px] px-3.5 gap-2 text-xs font-semibold border-border hover:bg-accent hover:text-accent-foreground"
-            title="ทดสอบระบบเสียงสังเคราะห์ (Quick Voice Test)"
-            aria-label="ทดสอบระบบเสียงสังเคราะห์ (Quick Voice Test)"
-          >
-            {isTestingVoice ? (
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            ) : (
-              <span className="material-symbols-rounded text-base text-primary select-none">
-                volume_up
-              </span>
+          <span
+            className={cn(
+              "w-2.5 h-2.5 rounded-full transition-colors shrink-0",
+              masterTtsEnabled
+                ? "bg-emerald-500 shadow-[0_0_6px_#10b981]"
+                : "bg-rose-500 shadow-[0_0_6px_#f43f5e]"
             )}
-            <span className="hidden sm:inline">
-              {isTestingVoice ? "กำลังทดสอบ..." : "ทดสอบเสียง"}
-            </span>
-          </Button>
-        )}
-
-        {/* TTS Master Toggle Switch */}
-        <div className="flex items-center gap-2.5 bg-card border border-border px-3.5 py-1.5 rounded-lg shadow-xs h-11 min-h-[44px]">
-          <span className="text-[11px] sm:text-xs font-semibold text-foreground whitespace-nowrap select-none hidden xs:inline">
-            Master TTS
+            aria-hidden="true"
+          />
+          <span className="whitespace-nowrap hidden xs:inline">Master TTS</span>
+          <span
+            className={cn(
+              "text-[10px] font-mono px-1.5 py-0.5 rounded font-bold uppercase",
+              masterTtsEnabled
+                ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                : "bg-rose-500/20 text-rose-700 dark:text-rose-300"
+            )}
+          >
+            {masterTtsEnabled ? "ON" : "OFF"}
           </span>
-          <label className="relative inline-flex items-center cursor-pointer select-none">
+        </button>
+
+        {/* Quick Voice Test Trigger Button */}
+        <Button
+          type="button"
+          variant="outline"
+          size="default"
+          onClick={handleTestVoice}
+          disabled={isTestingVoice}
+          className="h-11 min-h-[44px] px-3 sm:px-3.5 gap-2 text-xs font-semibold border-border hover:bg-accent hover:text-accent-foreground select-none"
+          title="Quick Voice Test"
+          aria-label="Test Voice"
+        >
+          {isTestingVoice ? (
+            <Loader2 className="w-4 h-4 animate-spin text-primary shrink-0" aria-hidden="true" />
+          ) : (
+            <Volume2 className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+          )}
+          <span className="whitespace-nowrap">
+            {isTestingVoice ? "Testing..." : "Test Voice"}
+          </span>
+        </Button>
+
+        {/* Volume Control: Slider & Mute Toggle (settings.volume) */}
+        <div
+          className="flex items-center gap-1.5 bg-card/60 border border-border px-2 py-1 rounded-lg shadow-xs h-11 min-h-[44px]"
+          title={`TTS Master Volume: ${Math.round(currentVolume * 100)}%`}
+        >
+          <button
+            type="button"
+            onClick={toggleMute}
+            className="h-9 w-9 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring select-none"
+            aria-label={isMuted ? "Unmute TTS audio" : "Mute TTS audio"}
+            title={isMuted ? "Unmute TTS audio" : "Mute TTS audio"}
+          >
+            {isMuted ? (
+              <VolumeX className="w-4 h-4 text-rose-500 shrink-0" aria-hidden="true" />
+            ) : currentVolume <= 0.5 ? (
+              <Volume1 className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+            ) : (
+              <Volume2 className="w-4 h-4 text-primary shrink-0" aria-hidden="true" />
+            )}
+          </button>
+          <div className="hidden md:flex items-center gap-2 pr-1">
             <input
-              type="checkbox"
-              checked={masterTtsEnabled}
-              onChange={(e) => onToggleMaster?.(e.target.checked)}
-              className="sr-only peer"
-              aria-label="สวิตช์เปิด/ปิด TTS ทั้งหมด (Master TTS)"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={currentVolume}
+              onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
+              className="w-16 lg:w-20 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+              aria-label="Master Output Volume Slider"
             />
-            <div className="w-10 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary border border-border" />
-          </label>
+            <span className="text-[11px] font-mono text-muted-foreground w-8 text-right select-none">
+              {Math.round(currentVolume * 100)}%
+            </span>
+          </div>
         </div>
 
         {/* Theme Mode Toggle (Sun/Moon) */}
@@ -288,32 +462,19 @@ export function Navbar({
           className="h-11 w-11 min-h-[44px] min-w-[44px] border-border text-foreground hover:bg-accent hover:text-accent-foreground"
           title={
             theme === "dark"
-              ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)"
-              : "เปลี่ยนเป็นโหมดมืด (Dark Cinema Mode)"
+              ? "Switch to Light Mode"
+              : "Switch to Dark Cinema Mode"
           }
           aria-label="Toggle theme color scheme"
         >
           {theme === "dark" ? (
-            <Sun className="w-4 h-4 text-amber-400" />
+            <Sun className="w-4 h-4 text-amber-400" aria-hidden="true" />
           ) : (
-            <Moon className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+            <Moon className="w-4 h-4 text-slate-600 dark:text-slate-300" aria-hidden="true" />
           )}
         </Button>
 
-        {/* Room Switcher Button */}
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          onClick={onSwitchAccount || onOpenRoomModal}
-          className="h-11 w-11 min-h-[44px] min-w-[44px] border-border text-foreground hover:bg-accent hover:text-accent-foreground"
-          title={`เปลี่ยนห้อง TikTok LIVE: @${displayUser}`}
-          aria-label="Change live stream room"
-        >
-          <User className="w-4 h-4" />
-        </Button>
-
-        {/* User Profile & Role-Based Access Control (RBAC) Button */}
+        {/* User Profile Single Sign-On (SSO) & Role-Based Access Control (RBAC) */}
         <UserProfileButton
           onOpenAuthModal={() => {
             if (onOpenAuthModal) {
