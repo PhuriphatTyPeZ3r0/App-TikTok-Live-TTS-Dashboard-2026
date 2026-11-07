@@ -18,7 +18,7 @@
  * - Application Programming Interface (API)
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { X, AlertCircle, CheckCircle2, Loader2, Lock, Mail, User } from "lucide-react";
 import { useSupabaseAuth } from "../../hooks/useSupabaseAuth";
 import type { UserRole } from "../../types/auth";
@@ -62,6 +62,24 @@ export function AuthModal({
   const [oauthLoading, setOauthLoading] = useState<"google" | "tiktok" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMessage(null);
+      setSuccessMessage(null);
+      setSubmitting(false);
+      setOauthLoading(null);
+    }
+  }, [isOpen]);
 
   // Sync tab state when defaultTab changes
   useEffect(() => {
@@ -121,7 +139,8 @@ export function AuthModal({
             setErrorMessage(error.message);
           } else {
             setSuccessMessage("Authenticated successfully.");
-            setTimeout(() => {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = setTimeout(() => {
               onClose();
             }, 600);
           }
@@ -144,7 +163,8 @@ export function AuthModal({
             setSuccessMessage(
               "Account registered successfully. If email verification is enabled, please verify your email."
             );
-            setTimeout(() => {
+            if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+            closeTimerRef.current = setTimeout(() => {
               onClose();
             }, 1200);
           }

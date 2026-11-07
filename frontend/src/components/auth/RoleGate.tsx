@@ -56,13 +56,18 @@ export function RoleGate({
     return <>{loadingFallback}</>;
   }
 
+  // Resolve effective Role-Based Access Control (RBAC) role
+  const effectiveRole = userRole || authRole;
+
+  // Explicit override check for testing and targeted sandboxing
+  if (userRole && !allowedRoles.includes(effectiveRole)) {
+    return <>{fallback}</>;
+  }
+
   // Resilient Offline Fallback: If Supabase API is unconfigured, allow local access
   if (!isConfigured) {
     return <>{children}</>;
   }
-
-  // Resolve effective Role-Based Access Control (RBAC) role
-  const effectiveRole = userRole || authRole;
 
   // Authorization Check
   if (allowedRoles.includes(effectiveRole)) {

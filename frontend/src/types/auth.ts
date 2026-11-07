@@ -48,7 +48,7 @@ export interface AuthState {
   user: User | null;
   /** Synchronized PostgreSQL user profile with Role-Based Access Control (RBAC) role. */
   profile: UserProfile | null;
-  /** Active effective Role-Based Access Control (RBAC) role (defaults to 'admin' in offline demo mode, 'viewer' unauthenticated). */
+  /** Active effective Role-Based Access Control (RBAC) role (defaults to 'streamer' in offline demo mode, 'viewer' unauthenticated). */
   role: UserRole;
   /** Loading or revalidation status indicator. */
   loading: boolean;
