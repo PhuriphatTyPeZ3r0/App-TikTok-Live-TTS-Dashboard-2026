@@ -22,6 +22,8 @@
 import React, { useState } from "react";
 import { Loader2, Sun, Moon, User } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
+import { UserProfileButton } from "./auth/UserProfileButton";
+import { AuthModal } from "./auth/AuthModal";
 
 export interface NavbarProps {
   /** Optional TikTok creator handle (e.g., @phuriphat_live). Defaults to @phuriphat_live. */
@@ -58,6 +60,8 @@ export interface NavbarProps {
   onOpenOBSPreview?: () => void;
   /** Callback to toggle collapsible sidebar navigation state. */
   onToggleSidebar?: () => void;
+  /** Callback to trigger Supabase authentication modal dialog. */
+  onOpenAuthModal?: () => void;
   /** Optional custom className */
   className?: string;
 }
@@ -87,10 +91,12 @@ export function Navbar({
   onOpenRoomModal,
   onSwitchAccount,
   onOpenOBSPreview,
+  onOpenAuthModal,
   className = "",
 }: NavbarProps): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
   const [copied, setCopied] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Clean creator handle for display
   const displayUser = username.replace(/^@/, "").trim() || "phuriphat_live";
@@ -232,7 +238,7 @@ export function Navbar({
           )}
         </button>
 
-        {/* Room Switcher / Creator Profile Avatar */}
+        {/* Room Switcher Button */}
         <button
           type="button"
           onClick={onSwitchAccount || onOpenRoomModal}
@@ -242,7 +248,24 @@ export function Navbar({
         >
           <User className="w-4 h-4" />
         </button>
+
+        {/* User Profile & Role-Based Access Control (RBAC) Button */}
+        <UserProfileButton
+          onOpenAuthModal={() => {
+            if (onOpenAuthModal) {
+              onOpenAuthModal();
+            } else {
+              setAuthModalOpen(true);
+            }
+          }}
+        />
       </div>
+
+      {/* Supabase Authentication & Role-Based Access Control (RBAC) Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+      />
     </header>
   );
 }
