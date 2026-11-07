@@ -1,30 +1,6 @@
 import type { Metadata } from "next";
-import { Prompt, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "../context/ThemeContext";
 import "./globals.css";
-
-/**
- * StreamVox Live Typography Loaders:
- * Prompt (300, 400, 500, 600, 700) - Primary Thai & Latin UI font for StreamVox Live.
- * JetBrains Mono (400, 600) - Telemetry, audio levels, timestamps, and diagnostics.
- *
- * Fallback typography design tokens: Roboto, Roboto_Mono, Kanit for sans-serif.
- * Weights: ["400", "500", "700"].
- * Attached variables: --font-roboto, --font-roboto-mono, --font-kanit.
- */
-const promptFont = Prompt({
-  weight: ["300", "400", "500", "600", "700"],
-  subsets: ["thai", "latin"],
-  variable: "--font-prompt",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  weight: ["400", "600"],
-  subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
-  display: "swap",
-});
 
 /**
  * Root metadata for Single-Page Application (SPA) dashboard.
@@ -57,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${promptFont.variable} ${jetbrainsMono.variable} dark`}
+      className="dark"
       style={
         {
           "--font-roboto": "var(--font-prompt), sans-serif",
@@ -68,12 +44,14 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         />
       </head>
-      <body className={`${promptFont.className} font-sans antialiased bg-white dark:bg-broadcast-dark text-broadcast-dark dark:text-white min-h-screen min-h-[100dvh] transition-colors duration-200`}>
+      <body className="font-sans antialiased bg-white dark:bg-broadcast-dark text-broadcast-dark dark:text-white min-h-screen min-h-[100dvh] transition-colors duration-200">
         <ThemeProvider>
           {children}
         </ThemeProvider>
