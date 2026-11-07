@@ -302,13 +302,13 @@ export function AuthModal({
           <GoogleLoginButton
             onClick={handleGoogleLogin}
             loading={oauthLoading === "google"}
-            disabled={!isConfigured || submitting}
+            disabled={submitting || oauthLoading !== null}
             label="Continue with Google SSO"
           />
           <TikTokLoginButton
             onClick={handleTikTokLogin}
             loading={oauthLoading === "tiktok"}
-            disabled={!isConfigured || submitting}
+            disabled={submitting || oauthLoading !== null}
             label="Continue with TikTok SSO"
           />
         </div>

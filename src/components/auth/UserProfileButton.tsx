@@ -119,15 +119,15 @@ export function UserProfileButton({
     .slice(0, 2)
     .toUpperCase() || "SV";
 
-  // Unauthenticated & Configured state: Show prominent Sign In trigger button
-  if (isConfigured && !user) {
+  // Unauthenticated state: Show prominent Sign In trigger button
+  if (!user) {
     return (
       <div className={`relative ${className}`}>
         <button
           type="button"
           onClick={onOpenAuthModal}
           aria-label="Sign in to StreamVox"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] hover:border-[#25f4ee]/30 text-slate-200 hover:text-white transition-all shadow-sm active:scale-95"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] hover:border-[#25f4ee]/30 text-slate-200 hover:text-white transition-all shadow-sm active:scale-95 min-h-[38px]"
         >
           <User className="w-3.5 h-3.5 text-[#25f4ee]" />
           <span>Sign In</span>
