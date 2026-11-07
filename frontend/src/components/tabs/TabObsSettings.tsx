@@ -17,24 +17,30 @@ export interface TabObsSettingsProps {
   settings: TikFinitySettings;
   onUpdate: (partial: Partial<TikFinitySettings>) => void;
   sessionId?: string;
+  backendUrl?: string;
+  overlayToken?: string;
 }
 
 export function TabObsSettings({
   settings,
   onUpdate,
   sessionId,
+  backendUrl = "",
+  overlayToken = "",
 }: TabObsSettingsProps) {
   const [copied, setCopied] = useState<boolean>(false);
   const [overlayUrl, setOverlayUrl] = useState<string>("");
 
   useEffect(() => {
-    const origin =
-      typeof window !== "undefined"
-        ? window.location.origin.replace("3000", "8000")
-        : "https://tiktok-live-tts-bot.onrender.com";
+    const cleanBackend = (
+      backendUrl ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      "https://tiktok-live-tts-bot.onrender.com"
+    ).replace(/\/+$/, "");
     const cleanSession = sessionId || "default_session";
-    setOverlayUrl(`${origin}/overlay/${cleanSession}?volume=${settings.volume}`);
-  }, [sessionId, settings.volume]);
+    const tokenParam = overlayToken ? `&token=${encodeURIComponent(overlayToken)}` : "";
+    setOverlayUrl(`${cleanBackend}/overlay/${cleanSession}?volume=${settings.volume}${tokenParam}`);
+  }, [sessionId, settings.volume, backendUrl, overlayToken]);
 
   const handleCopy = async () => {
     try {

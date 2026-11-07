@@ -56,6 +56,31 @@ def test_overlay_page_rendering_valid_token(client: TestClient, test_session: Se
     assert sid in text
 
 
+def test_overlay_page_omitted_token_succeeds(client: TestClient, test_session: SessionInstance) -> None:
+    """Test GET /overlay/{session_id} without token returns HTTP 200 OK using session credentials."""
+    sid = test_session.session_id
+    response = client.get(f"/overlay/{sid}?volume=1")
+    assert response.status_code == status.HTTP_200_OK
+    assert "text/html" in response.headers["content-type"]
+    assert sid in response.text
+    assert test_session.overlay_token in response.text
+
+
+def test_overlay_page_head_request_succeeds(client: TestClient, test_session: SessionInstance) -> None:
+    """Test HEAD /overlay/{session_id} returns HTTP 200 OK for TikTok LIVE Studio and OBS URL probes."""
+    sid = test_session.session_id
+    response = client.head(f"/overlay/{sid}?volume=1")
+    assert response.status_code == status.HTTP_200_OK
+    assert "text/html" in response.headers["content-type"]
+
+
+def test_overlay_root_redirect(client: TestClient, test_session: SessionInstance) -> None:
+    """Test GET /overlay redirects to the active session's overlay URL with token."""
+    response = client.get("/overlay", follow_redirects=False)
+    assert response.status_code in (status.HTTP_307_TEMPORARY_REDIRECT, status.HTTP_302_FOUND)
+    assert "/overlay/" in response.headers["location"]
+
+
 def test_overlay_page_invalid_token(client: TestClient, test_session: SessionInstance) -> None:
     """Test GET /overlay/{session_id} with invalid token returns HTTP 403 Forbidden."""
     sid = test_session.session_id

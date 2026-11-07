@@ -75,9 +75,16 @@ class AudioQueuePlayer {
     this.ctx = AudioContextClass ? new AudioContextClass() : null;
     this.queue = [];
     this.isPlaying = false;
+    this.volume = 1.0;
     this.currentSource = null;
     this.onAlertStart = null;
     this.onAlertEnd = null;
+  }
+
+  setVolume(vol) {
+    if (typeof vol === 'number' && !isNaN(vol)) {
+      this.volume = Math.max(0, Math.min(1, vol));
+    }
   }
 
   ensureContext() {
@@ -125,7 +132,13 @@ class AudioQueuePlayer {
       const audioBuffer = await this.ctx.decodeAudioData(bytes.buffer.slice(0));
       const source = this.ctx.createBufferSource();
       source.buffer = audioBuffer;
-      source.connect(this.ctx.destination);
+
+      // Apply volume gain control
+      const gainNode = this.ctx.createGain();
+      const currentVol = typeof this.volume === 'number' ? Math.max(0, Math.min(1, this.volume)) : 1.0;
+      gainNode.gain.setValueAtTime(currentVol, this.ctx.currentTime);
+      source.connect(gainNode);
+      gainNode.connect(this.ctx.destination);
       this.currentSource = source;
 
       source.onended = () => {

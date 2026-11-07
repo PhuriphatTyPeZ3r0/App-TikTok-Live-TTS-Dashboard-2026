@@ -33,6 +33,7 @@ export interface TikFinitySettingsProps {
   backendUrl?: string;
   testingVoiceId?: string | null;
   sessionId?: string;
+  overlayToken?: string;
   className?: string;
 }
 
@@ -59,6 +60,7 @@ export function TikFinitySettings({
   backendUrl = "",
   testingVoiceId = null,
   sessionId,
+  overlayToken = "",
   className = "",
 }: TikFinitySettingsProps) {
   const [activeTab, setActiveTab] = useState<SettingsTabId>("chat");
@@ -142,6 +144,8 @@ export function TikFinitySettings({
             settings={settings}
             onUpdate={onUpdate}
             sessionId={sessionId}
+            backendUrl={backendUrl}
+            overlayToken={overlayToken}
           />
         )}
       </div>

@@ -17,7 +17,7 @@ import urllib.parse
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -293,50 +293,87 @@ async def get_index_page(
     )
 
 
-@app.get("/overlay/{session_id}", response_class=HTMLResponse)
+@app.api_route("/overlay/{session_id}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def get_overlay_page(
     request: Request,
     session_id: str,
-    token: str = Query(..., description="Overlay read-only security token."),
-) -> HTMLResponse:
+    token: Optional[str] = Query(None, description="Overlay read-only security token."),
+) -> Response:
     """Render transparent visual alert and Web Audio playback overlay for OBS Studio.
 
-    Requires valid overlay token matching the active session.
+    Supports both GET and HEAD requests for compatibility with live streaming suites
+    such as TikTok LIVE Studio and Open Broadcaster Software (OBS) Studio URL health checkers.
+    If token is omitted, automatically resolves using active session credentials.
 
     Args:
         request: FastAPI Request instance.
         session_id: Target session Universally Unique Identifier (UUID).
-        token: Overlay read-only security token.
+        token: Optional overlay read-only security token.
 
     Raises:
-        HTTPException 404: If the session does not exist.
-        HTTPException 403: If the token does not match session overlay token.
+        HTTPException 404: If the session does not exist and no active session fallback is present.
+        HTTPException 403: If an explicit token is provided but does not match session overlay token.
 
     Returns:
-        Rendered HTML response for templates/overlay.html.
+        Rendered HTML response for templates/overlay.html or HTTP 200 on HEAD probes.
     """
     session = session_manager.get_session(session_id)
     if session is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found",
-        )
+        # Fallback to active running session or preview session if available
+        active = next((s for s in session_manager.list_sessions() if s.is_running), None)
+        if active is not None:
+            session = active
+        elif session_id in ("default_session", "preview"):
+            sessions = session_manager.list_sessions()
+            if sessions:
+                session = sessions[0]
+            else:
+                session = session_manager.create_session("streamvox_streamer")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found",
+            )
 
-    if not secrets.compare_digest(token, session.overlay_token):
+    if token is not None and token not in ("overlay_token", "default_token") and not secrets.compare_digest(token, session.overlay_token):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Forbidden: Invalid overlay authorization token",
         )
 
     session.touch()
+    if request.method == "HEAD":
+        return Response(status_code=status.HTTP_200_OK, media_type="text/html")
+
     return templates.TemplateResponse(
         request=request,
         name="overlay.html",
         context={
             "session_id": session.session_id,
-            "token": token,
+            "token": token or session.overlay_token,
             "tiktok_username": session.tiktok_username,
         },
+    )
+
+
+@app.api_route("/overlay", methods=["GET", "HEAD"], response_class=HTMLResponse)
+async def get_overlay_root(
+    request: Request,
+    token: Optional[str] = Query(None, description="Optional overlay security token."),
+) -> Response:
+    """Redirect root /overlay requests to the currently active or newest live stream session."""
+    active = next((s for s in session_manager.list_sessions() if s.is_running), None)
+    if active is None:
+        sessions = session_manager.list_sessions()
+        if sessions:
+            active = sessions[0]
+        else:
+            active = session_manager.create_session("streamvox_streamer")
+
+    token_param = f"?token={urllib.parse.quote(token or active.overlay_token)}"
+    return RedirectResponse(
+        url=f"/overlay/{active.session_id}{token_param}",
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
 

@@ -54,6 +54,13 @@
     // Instantiate Web Audio API Engine
     const audioPlayer = new AudioQueuePlayer();
 
+    // Adjust playback volume from query parameter (e.g. ?volume=0.8)
+    const urlParams = new URLSearchParams(window.location.search);
+    const volumeParam = parseFloat(urlParams.get('volume'));
+    if (!isNaN(volumeParam) && volumeParam >= 0 && volumeParam <= 1) {
+      audioPlayer.volume = volumeParam;
+    }
+
     // Callback when speech alert begins
     audioPlayer.onAlertStart = (item) => {
       alertUsername.textContent = item.user_id ? (item.user_id.startsWith('@') ? item.user_id : '@' + item.user_id) : '@ผู้ชม';
@@ -89,7 +96,12 @@
 
     function connectWebSocket() {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/overlay/${sessionId}?token=${overlayToken}`;
+      let wsHost = window.location.host;
+      // If loaded through Vercel reverse proxy or rewrites, connect directly to FastAPI backend on Render
+      if (wsHost.includes('vercel.app')) {
+        wsHost = 'tiktok-live-tts-bot.onrender.com';
+      }
+      const wsUrl = `${protocol}//${wsHost}/ws/overlay/${sessionId}?token=${overlayToken}`;
 
       socket = new WebSocket(wsUrl);
 

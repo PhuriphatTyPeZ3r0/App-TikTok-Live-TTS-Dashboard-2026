@@ -853,6 +853,7 @@ function TikFinityDashboardContent() {
           backendUrl={backendUrl}
           testingVoiceId={testingVoiceId}
           sessionId={sessionId}
+          overlayToken={overlayToken}
         />
 
         {/* Right Column (0.85fr): Live Queue & Playback Console */}
