@@ -139,6 +139,20 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
   const [remoteError, setRemoteError] = useState<string | null>(null);
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  const isRemoteActiveRef = useRef<boolean>(isRemoteActive);
+  const copyTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const copyJsonTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    isRemoteActiveRef.current = isRemoteActive;
+  }, [isRemoteActive]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      if (copyJsonTimerRef.current) clearTimeout(copyJsonTimerRef.current);
+    };
+  }, []);
 
   // 1. Initial hydration and real-time subscription lifecycle
   useEffect(() => {
@@ -148,7 +162,8 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
 
     // Subscribe to live incoming events from the logger event bus
     const unsubscribe = subscribeToLogs((newEntry: LogEntry) => {
-      // Append only when in local mode or when remote mode is inactive
+      // Append only when local client mode is active to prevent polluting remote server telemetry view
+      if (isRemoteActiveRef.current) return;
       setLogs((prev) => {
         const next = [...prev, newEntry];
         return next.length > 500 ? next.slice(next.length - 500) : next;
@@ -183,8 +198,16 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
       }
 
       const data = await response.json();
-      if (data && Array.isArray(data.data)) {
-        const normalized: LogEntry[] = data.data.map((item: any, index: number) => ({
+      const rawList = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.logs)
+        ? data.logs
+        : Array.isArray(data?.data)
+        ? data.data
+        : [];
+
+      if (rawList.length > 0 || Array.isArray(data?.logs) || Array.isArray(data?.data)) {
+        const normalized: LogEntry[] = rawList.map((item: any, index: number) => ({
           id: item.id || `remote-${index}-${Date.now()}`,
           timestamp: item.timestamp || new Date().toISOString(),
           level: (item.level as LogLevel) || "INFO",
@@ -265,11 +288,15 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
     });
   }, [logs, selectedLevel, selectedCategory, searchQuery]);
 
-  // 4. Auto-scroll execution when new matching records arrive
+  // 4. Auto-scroll execution when new matching records arrive (frame-debounced)
   useEffect(() => {
-    if (autoScroll && terminalEndRef.current) {
-      terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    if (!autoScroll) return;
+    const rafId = requestAnimationFrame(() => {
+      if (terminalEndRef.current) {
+        terminalEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [filteredLogs, autoScroll]);
 
   // 5. Actions: Clear logs
@@ -278,18 +305,19 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
     setLogs([]);
   };
 
-  // 6. Actions: Export filtered logs to JSON file
+  // 6. Actions: Export filtered logs to JSON file via standard Blob and Object URL
   const handleExportJson = () => {
-    const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-      JSON.stringify(filteredLogs, null, 2)
-    )}`;
+    const jsonString = JSON.stringify(filteredLogs, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
     const downloadAnchor = document.createElement("a");
     const dateStr = new Date().toISOString().replace(/[:.]/g, "-");
-    downloadAnchor.setAttribute("href", jsonString);
-    downloadAnchor.setAttribute("download", `streamvox-logs-${dateStr}.json`);
+    downloadAnchor.href = url;
+    downloadAnchor.download = `streamvox-logs-${dateStr}.json`;
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+    URL.revokeObjectURL(url);
   };
 
   // 7. Actions: Copy single log row
@@ -301,7 +329,8 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
 
     navigator.clipboard.writeText(payload);
     setCopiedId(entry.id);
-    setTimeout(() => setCopiedId(null), 1500);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopiedId(null), 1500);
   };
 
   // 8. Actions: Copy JSON details
@@ -310,7 +339,8 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
     const json = JSON.stringify(entry.details, null, 2);
     navigator.clipboard.writeText(json);
     setCopiedJsonId(entry.id);
-    setTimeout(() => setCopiedJsonId(null), 1500);
+    if (copyJsonTimerRef.current) clearTimeout(copyJsonTimerRef.current);
+    copyJsonTimerRef.current = setTimeout(() => setCopiedJsonId(null), 1500);
   };
 
   // 9. Actions: Toggle detail accordion
