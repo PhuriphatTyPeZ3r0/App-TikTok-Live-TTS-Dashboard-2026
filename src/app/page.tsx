@@ -882,47 +882,42 @@ function TikFinityDashboardContent() {
   };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background text-foreground flex flex-col font-sans selection:bg-primary/30 selection:text-foreground">
-      {/* StreamVox Live Sticky Top Navigation Bar */}
-      <Navbar
-        username={username}
-        isConnected={isConnected}
-        isReconnecting={isReconnecting}
-        backendUrl={backendUrl}
-        sessionId={sessionId}
-        overlayToken={overlayToken}
-        masterTtsEnabled={settings.masterTtsEnabled}
-        onToggleMaster={(enabled) => updateSettings({ masterTtsEnabled: enabled })}
-        onTestVoice={handleQuickVoiceTest}
-        isTestingVoice={isTestingVoice}
-        selectedVoiceId={selectedVoiceId}
-        onOpenRoomModal={() => setShowRoomModal(true)}
-        onSwitchAccount={() => setShowRoomModal(true)}
-        onToggleSidebar={() => setSidebarMobileOpen((prev) => !prev)}
-        isSidebarOpen={sidebarMobileOpen}
+    <div className="min-h-screen min-h-[100dvh] bg-background text-foreground font-sans selection:bg-primary/30 selection:text-foreground">
+      {/* 1. Flowbite Standard Sidebar (fixed top-0 left-0 z-40 w-64 h-full) */}
+      <Sidebar
+        activeTab={activeNavTab}
+        onTabChange={handleSelectNavTab}
+        onSelectTab={handleSelectNavTab}
+        isMobileOpen={sidebarMobileOpen}
+        onMobileClose={() => setSidebarMobileOpen(false)}
+        onCloseMobile={() => setSidebarMobileOpen(false)}
+        liveQueueCount={queue.length}
+        isStreaming={isConnected}
       />
 
-      <div className="flex flex-1 w-full relative">
-        {/* StreamVox Live Responsive Hybrid Collapsible Sidebar */}
-        <Sidebar
-          isCollapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
-          activeTab={activeNavTab}
-          onTabChange={handleSelectNavTab}
-          onSelectTab={handleSelectNavTab}
-          isMobileOpen={sidebarMobileOpen}
-          onMobileClose={() => setSidebarMobileOpen(false)}
-          onCloseMobile={() => setSidebarMobileOpen(false)}
-          liveQueueCount={queue.length}
-          isStreaming={isConnected}
+      {/* 2. Flowbite Standard Main Layout Container (sm:ml-64) */}
+      <div className="sm:ml-64 min-h-screen min-h-[100dvh] flex flex-col">
+        {/* StreamVox Live Sticky Top Navigation Bar */}
+        <Navbar
+          username={username}
+          isConnected={isConnected}
+          isReconnecting={isReconnecting}
+          backendUrl={backendUrl}
+          sessionId={sessionId}
+          overlayToken={overlayToken}
+          masterTtsEnabled={settings.masterTtsEnabled}
+          onToggleMaster={(enabled) => updateSettings({ masterTtsEnabled: enabled })}
+          onTestVoice={handleQuickVoiceTest}
+          isTestingVoice={isTestingVoice}
+          selectedVoiceId={selectedVoiceId}
+          onOpenRoomModal={() => setShowRoomModal(true)}
+          onSwitchAccount={() => setShowRoomModal(true)}
+          onToggleSidebar={() => setSidebarMobileOpen((prev) => !prev)}
+          isSidebarOpen={sidebarMobileOpen}
         />
 
         {/* Main 2-Column Master Console Layout with Bento Grid & Safe Area Padding */}
-        <main
-          className={`flex-1 w-full min-w-0 transition-all duration-300 ${
-            sidebarCollapsed ? "md:ml-16" : "md:ml-64"
-          } ml-0 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))]`}
-        >
+        <main className="flex-1 w-full min-w-0 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))]">
           <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-4 sm:gap-6 w-full">
             {/* Left Column: StreamVox & TikFinity Tabbed Settings Panel */}
             <div id="settings-section" className="w-full">

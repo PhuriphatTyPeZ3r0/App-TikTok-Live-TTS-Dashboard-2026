@@ -129,27 +129,44 @@ export function Navbar({
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full bg-background/85 backdrop-blur-md border-b border-border px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))] shadow-xs flex items-center justify-between gap-2.5 sm:gap-4 transition-colors",
+        "sticky top-0 z-30 w-full bg-background/85 backdrop-blur-md border-b border-border px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 pt-[calc(0.625rem+env(safe-area-inset-top,0px))] shadow-xs flex items-center justify-between gap-2.5 sm:gap-4 transition-colors",
         className
       )}
       aria-label="StreamVox Live Master Navigation Bar"
     >
-      {/* Left Section: Mobile Hamburger, Brand Logo & Title */}
+      {/* Left Section: Flowbite Mobile Hamburger, Brand Logo & Title */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Mobile Hamburger Drawer Toggle (Touch target >= 44x44px, hidden on md+) */}
+        {/* Responsive Mobile Drawer Menu Toggle (Flowbite Standard: inline-flex sm:hidden) */}
         {onToggleSidebar && (
-          <Button
+          <button
+            data-drawer-target="logo-sidebar"
+            data-drawer-toggle="logo-sidebar"
+            aria-controls="logo-sidebar"
             type="button"
-            variant="outline"
-            size="icon"
             onClick={onToggleSidebar}
             aria-expanded={isSidebarOpen}
-            aria-label="Toggle navigation menu"
-            title="เปิด/ปิดเมนูนำทาง (Toggle Sidebar)"
-            className="h-11 w-11 min-h-[44px] min-w-[44px] md:hidden shrink-0 border-border text-foreground hover:bg-accent hover:text-accent-foreground"
+            className="text-foreground bg-transparent border border-border hover:bg-accent focus:ring-2 focus:ring-ring font-medium rounded-lg text-sm p-2 focus:outline-none inline-flex sm:hidden min-h-[44px] min-w-[44px] items-center justify-center shrink-0 min-touch-target"
+            aria-label="Open sidebar"
+            title="เปิดแถบเมนู (Open sidebar)"
           >
-            <Menu className="w-5 h-5" />
-          </Button>
+            <span className="sr-only">Open sidebar</span>
+            <svg
+              className="w-6 h-6"
+              aria-hidden="true"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeWidth="2"
+                d="M5 7h14M5 12h14M5 17h10"
+              />
+            </svg>
+          </button>
         )}
 
         {/* Brand Icon Box (Touch target >= 44x44px, triggers onToggleSidebar if desktop drawer) */}
