@@ -183,9 +183,30 @@ def test_session_test_voice(client: TestClient) -> None:
 
 def test_start_session_validation_error(client: TestClient) -> None:
     """Verify invalid payloads return 422 Unprocessable Entity."""
-    # Missing required field fish_audio_api_key
+    # Missing required field fish_audio_api_key on /api/session/start
     invalid_payload = {
         "tiktok_username": "@streamer_only",
     }
     res = client.post("/api/session/start", json=invalid_payload)
     assert res.status_code == 422
+
+
+def test_create_session_endpoint_rest(client: TestClient) -> None:
+    """Verify POST /api/sessions and POST /api/session create a new room session without requiring fish_audio_api_key."""
+    # 1. Test POST /api/sessions with only tiktok_username
+    res1 = client.post("/api/sessions", json={"tiktok_username": "arm_phx"})
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert "session_id" in data1
+    assert "admin_token" in data1
+    assert "overlay_token" in data1
+    assert data1["tiktok_username"] == "arm_phx"
+    assert "overlay_url" in data1
+    assert "dashboard_url" in data1
+
+    # 2. Test POST /api/session alias
+    res2 = client.post("/api/session", json={"tiktok_username": "@phuriphat_live"})
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["tiktok_username"] == "@phuriphat_live"
+

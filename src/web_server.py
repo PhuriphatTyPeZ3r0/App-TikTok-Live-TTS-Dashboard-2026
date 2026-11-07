@@ -181,6 +181,22 @@ class StartSessionRequest(BaseModel):
     custom_blacklist: Optional[List[str]] = Field(None, description="List of prohibited profanities and filtered words.")
 
 
+class CreateSessionRequest(BaseModel):
+    """Pydantic model validating live session creation from frontend dashboard or API."""
+
+    tiktok_username: str = Field(..., description="Target TikTok creator username (e.g. '@username').")
+    fish_audio_api_key: Optional[str] = Field(None, description="Optional Fish Audio API key override.")
+    proxy_url: Optional[str] = Field(None, description="Optional forward HTTP or SOCKS5 proxy URL.")
+    enable_comments: bool = Field(True, description="Enable speech synthesis for regular viewer chat comments.")
+    enable_gifts: bool = Field(True, description="Enable priority speech synthesis for virtual gift events.")
+    user_cooldown: int = Field(5, description="Per-user anti-spam cooldown window in seconds.")
+    max_comment_length: int = Field(80, description="Maximum character threshold before text truncation.")
+    custom_phonetics: Optional[Dict[str, str]] = Field(None, description="Dictionary of slang to Thai pronunciation overrides.")
+    custom_blacklist: Optional[List[str]] = Field(None, description="List of prohibited profanities and filtered words.")
+    selected_voice_id: Optional[str] = Field(None, description="Optional initial voice profile identifier.")
+
+
+
 # ==============================================================================
 # HTML Template User Interface (UI) Endpoints & Decoupled Frontend Redirects
 # ==============================================================================
@@ -569,6 +585,71 @@ async def update_colab_settings(
         "colab_tunnel_url": config.colab_tunnel_url,
         "prefer_colab_tts": config.prefer_colab_tts,
         "colab_tts_timeout_seconds": config.colab_tts_timeout_seconds,
+    }
+
+
+@app.post("/api/sessions", status_code=status.HTTP_200_OK)
+@app.post("/api/session", status_code=status.HTTP_200_OK)
+@app.post("/api/session/create", status_code=status.HTTP_200_OK)
+async def create_session_endpoint(payload: CreateSessionRequest, request: Request) -> Dict[str, Any]:
+    """Create a new live stream Text-to-Speech (TTS) creator room session or switch active room.
+
+    Allows zero-configuration room switching without requiring fish_audio_api_key.
+    Synchronizes new session as active default_session for subsequent auto-discovery.
+
+    Args:
+        payload: Validated CreateSessionRequest parameters.
+        request: FastAPI Request instance.
+
+    Returns:
+        JSON payload containing session IDs, tokens, and navigation URLs.
+    """
+    clean_username = payload.tiktok_username.strip()
+    if not clean_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="tiktok_username cannot be empty",
+        )
+
+    app_config: Optional[AppConfig] = getattr(request.app.state, "config", getattr(app.state, "config", None))
+    colab_tunnel_url = app_config.colab_tunnel_url if app_config else None
+    prefer_colab_tts = app_config.prefer_colab_tts if app_config else True
+    colab_tts_timeout_seconds = app_config.colab_tts_timeout_seconds if app_config else 5.0
+    hf_token = app_config.hf_token if app_config else None
+
+    api_key = payload.fish_audio_api_key or (getattr(app_config, "fish_audio_api_key", "") if app_config else "") or ""
+
+    session: SessionInstance = session_manager.create_session(
+        tiktok_username=clean_username,
+        fish_audio_api_key=api_key,
+        proxy_url=payload.proxy_url,
+        enable_comments=payload.enable_comments,
+        enable_gifts=payload.enable_gifts,
+        user_cooldown=payload.user_cooldown,
+        max_comment_length=payload.max_comment_length,
+        custom_phonetics=payload.custom_phonetics,
+        custom_blacklist=payload.custom_blacklist,
+        colab_tunnel_url=colab_tunnel_url,
+        prefer_colab_tts=prefer_colab_tts,
+        colab_tts_timeout_seconds=colab_tts_timeout_seconds,
+        hf_token=hf_token,
+        selected_voice_id=payload.selected_voice_id or "yuta",
+    )
+
+    request.app.state.default_session = session
+    if not hasattr(request.app.state, "_background_tasks"):
+        request.app.state._background_tasks = set()
+    start_task = asyncio.create_task(session.start())
+    request.app.state._background_tasks.add(start_task)
+    start_task.add_done_callback(request.app.state._background_tasks.discard)
+
+    return {
+        "session_id": session.session_id,
+        "admin_token": session.admin_token,
+        "overlay_token": session.overlay_token,
+        "overlay_url": f"/overlay/{session.session_id}?token={session.overlay_token}",
+        "dashboard_url": f"/dashboard/{session.session_id}?token={session.admin_token}",
+        "tiktok_username": session.tiktok_username,
     }
 
 

@@ -766,14 +766,29 @@ function TikFinityDashboardContent() {
     setConnectionNotice(null);
 
     try {
-      const res = await fetch(`${backendUrl.replace(/\/+$/, "")}/api/sessions`, {
+      const cleanUrl = backendUrl.replace(/\/+$/, "");
+      let res = await fetch(`${cleanUrl}/api/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tiktok_username: cleanUser }),
       });
 
+      // Graceful fallback for older backend builds that only have /api/session/start
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${cleanUrl}/api/session/start`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tiktok_username: cleanUser, fish_audio_api_key: "" }),
+        });
+      }
+
       if (!res.ok) {
-        throw new Error(`Server returned HTTP ${res.status}`);
+        let errDetail = `Server returned HTTP ${res.status}`;
+        try {
+          const errJson = await res.json();
+          if (errJson?.detail) errDetail = errJson.detail;
+        } catch {}
+        throw new Error(errDetail);
       }
 
       const data = await res.json();
