@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "../context/ThemeContext";
+import { DashboardProvider } from "../context/DashboardContext";
 import "./globals.css";
 
 /**
@@ -53,7 +54,9 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased bg-white dark:bg-broadcast-dark text-broadcast-dark dark:text-white min-h-screen min-h-[100dvh] transition-colors duration-200">
         <ThemeProvider>
-          {children}
+          <DashboardProvider>
+            {children}
+          </DashboardProvider>
         </ThemeProvider>
       </body>
     </html>
