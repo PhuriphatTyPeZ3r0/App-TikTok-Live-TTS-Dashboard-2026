@@ -99,6 +99,26 @@ export function useRenderAuth(): RenderAuthState {
           setToken(activeToken);
         }
 
+        // Mock token fallback for local offline simulation
+        if (activeToken.startsWith('mock-render-jwt-')) {
+          const isMockAdmin = activeToken.includes('admin');
+          const mockUser: RenderUser = {
+            id: 'mock-usr-local-id',
+            email: isMockAdmin ? SUPERADMIN_EMAIL : 'streamer@streamvox.live',
+            name: isMockAdmin ? 'System Administrator (Mock)' : 'Demo Streamer (Mock)',
+            role: isMockAdmin ? 'admin' : 'streamer',
+            created_at: new Date().toISOString(),
+          };
+          if (isMounted) {
+            setUser(mockUser);
+            setRole(isMockAdmin ? 'admin' : 'streamer');
+            setIsAdmin(isMockAdmin);
+            setError(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         // 3. Request user profile verification from Render FastAPI backend
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_BASE_URL;
         const response = await fetch(`${baseUrl}/api/auth/me`, {
@@ -150,8 +170,21 @@ export function useRenderAuth(): RenderAuthState {
 
     initializeAuth();
 
+    const handleSync = () => {
+      initializeAuth();
+    };
+
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('streamvox-auth-sync', handleSync);
+      window.addEventListener('storage', handleSync);
+    }
+
     return () => {
       isMounted = false;
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+        window.removeEventListener('streamvox-auth-sync', handleSync);
+        window.removeEventListener('storage', handleSync);
+      }
     };
   }, []);
 
@@ -176,6 +209,9 @@ export function useRenderAuth(): RenderAuthState {
         localStorage.removeItem(STORAGE_KEY);
       } catch (storageErr) {
         console.warn('[useRenderAuth] Failed to purge token from LocalStorage:', storageErr);
+      }
+      if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('streamvox-auth-sync'));
       }
     }
 
@@ -230,6 +266,9 @@ export function useRenderAuth(): RenderAuthState {
       } catch (storageErr) {
         console.warn('[useRenderAuth] LocalStorage mock write restricted:', storageErr);
       }
+      if (typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('streamvox-auth-sync'));
+      }
     }
 
     setToken(mockJwt);
@@ -260,6 +299,9 @@ export function useRenderAuth(): RenderAuthState {
           setUser(data.user);
           setRole(data.user.role);
           setIsAdmin(data.user.role === 'admin' || data.user.email === SUPERADMIN_EMAIL);
+          if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('streamvox-auth-sync'));
+          }
         }
       })
       .catch(() => {
