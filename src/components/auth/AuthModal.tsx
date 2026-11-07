@@ -64,7 +64,7 @@ export function AuthModal({
   const [displayName, setDisplayName] = useState<string>("");
   const [selectedRole, setSelectedRole] = useState<UserRole>("streamer");
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [oauthLoading, setOauthLoading] = useState<"google" | "tiktok" | null>(null);
+  const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const closeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -84,7 +84,7 @@ export function AuthModal({
       setErrorMessage(null);
       setSuccessMessage(null);
       setSubmitting(false);
-      setOauthLoading(null);
+      setIsGoogleLoading(false);
     }
   }, [isOpen]);
 
@@ -102,22 +102,13 @@ export function AuthModal({
   // Google Single Sign-On (SSO) OAuth dispatcher via useRenderAuth
   const handleGoogleLogin = () => {
     setErrorMessage(null);
-    setOauthLoading("google");
+    setIsGoogleLoading(true);
     try {
       loginWithGoogle();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to initiate Google OAuth flow.";
       setErrorMessage(msg);
-      setOauthLoading(null);
-    }
-  };
-
-  // TikTok Single Sign-On (SSO) OAuth dispatcher via Render FastAPI
-  const handleTikTokLogin = () => {
-    setErrorMessage(null);
-    setOauthLoading("tiktok");
-    if (typeof window !== "undefined") {
-      window.location.href = `${API_BASE_URL}/api/auth/tiktok/login`;
+      setIsGoogleLoading(false);
     }
   };
 
@@ -291,12 +282,12 @@ export function AuthModal({
             type="button"
             variant="outline"
             size="default"
-            disabled={submitting || oauthLoading !== null}
+            disabled={submitting || isGoogleLoading}
             onClick={handleGoogleLogin}
             aria-label="Continue with Google Single Sign-On (SSO)"
             className="w-full h-11 min-h-[44px] flex items-center justify-center gap-3 font-medium border-border hover:bg-accent hover:text-accent-foreground"
           >
-            {oauthLoading === "google" ? (
+            {isGoogleLoading ? (
               <Loader2 className="w-4 h-4 animate-spin text-primary" />
             ) : (
               <svg
@@ -323,31 +314,7 @@ export function AuthModal({
                 />
               </svg>
             )}
-            <span>Continue with Google</span>
-          </Button>
-
-          {/* TikTok OAuth Button */}
-          <Button
-            type="button"
-            variant="outline"
-            size="default"
-            disabled={submitting || oauthLoading !== null}
-            onClick={handleTikTokLogin}
-            aria-label="Continue with TikTok Single Sign-On (SSO)"
-            className="w-full h-11 min-h-[44px] flex items-center justify-center gap-3 font-medium border-border hover:bg-accent hover:text-accent-foreground"
-          >
-            {oauthLoading === "tiktok" ? (
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            ) : (
-              <svg
-                className="w-4 h-4 shrink-0 fill-current"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.29 0 .58.04.85.11V9.33a6.33 6.33 0 0 0-.85-.06A6.34 6.34 0 0 0 3.14 15.6a6.34 6.34 0 0 0 6.34 6.34 6.33 6.33 0 0 0 6.34-6.34V8.58a8.28 8.28 0 0 0 4.77 1.5V6.69h-1z" />
-              </svg>
-            )}
-            <span>Continue with TikTok</span>
+            <span>Continue with Google SSO</span>
           </Button>
         </div>
 
