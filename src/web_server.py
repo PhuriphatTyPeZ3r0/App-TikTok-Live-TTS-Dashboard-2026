@@ -7,15 +7,19 @@ queue purges (CONTROL_FLUSH), health probes, and test speech synthesis injection
 """
 
 import asyncio
+from collections import deque
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 import logging
 import os
 from pathlib import Path
 import secrets
-from typing import Any, Dict, List, Optional
+import threading
+from typing import Any, Dict, List, Literal, Optional, Union
 import urllib.parse
+import uuid
 
-from fastapi import FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
+from fastapi import Body, FastAPI, Header, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -32,6 +36,11 @@ logger = logging.getLogger(__name__)
 
 # Singleton in-memory session registry and lifecycle manager
 session_manager = SessionManager()
+
+# Thread-safe in-memory circular ring buffer for structured log telemetry
+LOG_BUFFER_CAPACITY = 1000
+log_ring_buffer: deque = deque(maxlen=LOG_BUFFER_CAPACITY)
+log_buffer_lock: threading.Lock = threading.Lock()
 
 
 @asynccontextmanager
@@ -194,6 +203,87 @@ class CreateSessionRequest(BaseModel):
     custom_phonetics: Optional[Dict[str, str]] = Field(None, description="Dictionary of slang to Thai pronunciation overrides.")
     custom_blacklist: Optional[List[str]] = Field(None, description="List of prohibited profanities and filtered words.")
     selected_voice_id: Optional[str] = Field(None, description="Optional initial voice profile identifier.")
+
+
+LogLevelType = Literal["INFO", "WARN", "ERROR", "DEBUG"]
+LogCategoryType = Literal["TTS", "TIKTOK_WS", "AUTH", "NETWORK", "OVERLAY", "SYSTEM"]
+
+
+class LogEntryPayload(BaseModel):
+    """Structured log entry payload contract for diagnostic event ingestion."""
+
+    id: Optional[str] = Field(default=None, description="Universally Unique Identifier (UUID) of log entry")
+    timestamp: Optional[str] = Field(default=None, description="ISO 8601 formatted timestamp string in UTC")
+    level: LogLevelType = Field(..., description="Diagnostic severity level")
+    category: LogCategoryType = Field(..., description="Subsystem functional category")
+    message: str = Field(..., min_length=1, description="Structured log message")
+    details: Optional[Any] = Field(default=None, description="Supplementary context or parameters")
+    sessionId: Optional[str] = Field(default=None, description="Active live stream session identifier")
+    userId: Optional[str] = Field(default=None, description="Supabase user UUID")
+
+
+@app.post("/api/logs", status_code=status.HTTP_200_OK)
+async def ingest_logs(
+    payload: Union[LogEntryPayload, List[LogEntryPayload]] = Body(..., description="Single or batch of structured log entries")
+) -> Dict[str, Any]:
+    """Ingest structured diagnostic logs into the thread-safe circular ring buffer.
+
+    Accepts a single LogEntryPayload or a batch list of LogEntryPayload objects from client-side
+    or external telemetry collectors. Auto-populates missing UUID identifiers and ISO 8601
+    UTC timestamps. Thread-safe using threading.Lock.
+    """
+    entries = payload if isinstance(payload, list) else [payload]
+    now_utc = datetime.now(timezone.utc).isoformat()
+
+    with log_buffer_lock:
+        for entry in entries:
+            entry_dict = entry.model_dump()
+            if not entry_dict.get("id"):
+                entry_dict["id"] = str(uuid.uuid4())
+            if not entry_dict.get("timestamp"):
+                entry_dict["timestamp"] = now_utc
+            log_ring_buffer.append(entry_dict)
+        total_buffered = len(log_ring_buffer)
+
+    return {
+        "success": True,
+        "count": len(entries),
+        "total_buffered": total_buffered,
+    }
+
+
+@app.get("/api/logs", status_code=status.HTTP_200_OK)
+async def get_logs(
+    limit: int = Query(default=100, ge=1, le=1000, description="Maximum entries to return"),
+    level: Optional[str] = Query(default=None, description="Filter by severity level (INFO, WARN, ERROR, DEBUG)"),
+    category: Optional[str] = Query(default=None, description="Filter by subsystem category"),
+) -> Dict[str, Any]:
+    """Retrieve recent structured logs from the in-memory circular ring buffer.
+
+    Returns log records sorted in reverse-chronological order (latest events first),
+    optionally filtered by severity level and functional subsystem category.
+    """
+    with log_buffer_lock:
+        total_count = len(log_ring_buffer)
+        raw_entries = list(reversed(log_ring_buffer))
+
+    filtered: List[Dict[str, Any]] = []
+    level_filter = level.strip().upper() if level else None
+    cat_filter = category.strip().upper() if category else None
+
+    for item in raw_entries:
+        if level_filter and str(item.get("level", "")).upper() != level_filter:
+            continue
+        if cat_filter and str(item.get("category", "")).upper() != cat_filter:
+            continue
+        filtered.append(item)
+        if len(filtered) >= limit:
+            break
+
+    return {
+        "logs": filtered,
+        "total": total_count,
+    }
 
 
 
