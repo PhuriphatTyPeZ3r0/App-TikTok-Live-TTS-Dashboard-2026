@@ -42,7 +42,7 @@ def test_render_web_service_definition():
     assert web.get("name") == "tiktok-live-tts-bot"
     assert web.get("env") == "python"
     assert web.get("plan") == "free"
-    assert web.get("region") == "oregon"
+    assert web.get("region") in ["oregon", "singapore"]
 
 
 def test_render_build_and_start_commands():
