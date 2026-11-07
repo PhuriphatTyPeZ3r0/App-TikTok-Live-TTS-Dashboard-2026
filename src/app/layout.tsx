@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Prompt, JetBrains_Mono, Roboto, Roboto_Mono, Kanit } from "next/font/google";
+import { Prompt, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "../context/ThemeContext";
 import "./globals.css";
 
 /**
- * StreamVox Live & Red Broadcast Typography Loaders:
+ * StreamVox Live Typography Loaders:
  * Prompt (300, 400, 500, 600, 700) - Primary Thai & Latin UI font for StreamVox Live.
  * JetBrains Mono (400, 600) - Telemetry, audio levels, timestamps, and diagnostics.
- * Roboto, Roboto Mono, Kanit - Maintained for backward compatibility with design tokens.
  */
 const promptFont = Prompt({
   weight: ["300", "400", "500", "600", "700"],
@@ -21,27 +20,6 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains-mono",
   display: "swap",
-});
-
-const roboto = Roboto({
-  weight: ["400", "500", "700"],
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-roboto",
-});
-
-const robotoMono = Roboto_Mono({
-  weight: ["400"],
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-roboto-mono",
-});
-
-const kanit = Kanit({
-  weight: ["300", "400", "500", "600", "700"],
-  subsets: ["thai", "latin"],
-  display: "swap",
-  variable: "--font-kanit",
 });
 
 /**
@@ -75,7 +53,7 @@ export default function RootLayout({
   return (
     <html
       lang="th"
-      className={`${promptFont.variable} ${jetbrainsMono.variable} ${roboto.variable} ${robotoMono.variable} ${kanit.variable} dark`}
+      className={`${promptFont.variable} ${jetbrainsMono.variable} dark`}
       suppressHydrationWarning
     >
       <head>
