@@ -31,8 +31,9 @@ import { TabChatSettings } from "./tabs/TabChatSettings";
 import { TabGiftSettings } from "./tabs/TabGiftSettings";
 import { TabSafetySettings } from "./tabs/TabSafetySettings";
 import { TabObsSettings } from "./tabs/TabObsSettings";
+import { TabLogMonitor } from "./tabs/TabLogMonitor";
 
-export type SettingsTabId = "chat" | "voices" | "gift" | "safety" | "obs";
+export type SettingsTabId = "chat" | "voices" | "gift" | "safety" | "obs" | "logs";
 
 export interface TikFinitySettingsProps {
   settings: TikFinitySettingsType;
@@ -69,6 +70,7 @@ const TABS: TabDefinition[] = [
   { id: "gift", label: "Gift Alerts & TTS", icon: "redeem" },
   { id: "safety", label: "Safety & Filters", icon: "shield" },
   { id: "obs", label: "OBS & Output", icon: "live_tv" },
+  { id: "logs", label: "Logs", icon: "terminal" },
 ];
 
 export function TikFinitySettings({
@@ -219,6 +221,9 @@ export function TikFinitySettings({
             backendUrl={backendUrl}
             overlayToken={overlayToken}
           />
+        )}
+        {activeTab === "logs" && (
+          <TabLogMonitor backendUrl={backendUrl} />
         )}
       </div>
     </div>
