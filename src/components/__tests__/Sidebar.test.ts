@@ -20,13 +20,15 @@ import { SIDEBAR_ITEMS, type TabType } from "../Sidebar";
 
 describe("Sidebar Navigation Structure & Constants", () => {
   it("contains all required navigation items with unique ids", () => {
-    assert.strictEqual(SIDEBAR_ITEMS.length, 6);
+    assert.strictEqual(SIDEBAR_ITEMS.length, 8);
 
     const expectedIds: TabType[] = [
       "cockpit",
       "queue",
       "voice",
       "settings",
+      "gift",
+      "safety",
       "obs",
       "logs",
     ];

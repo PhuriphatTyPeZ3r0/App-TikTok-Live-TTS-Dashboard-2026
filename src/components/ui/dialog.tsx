@@ -135,7 +135,7 @@ export const DialogOverlay = React.forwardRef<
       ref={ref}
       aria-hidden="true"
       className={cn(
-        "fixed inset-0 z-50 bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in-0",
+        "fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in-0",
         className
       )}
       {...props}
@@ -195,8 +195,8 @@ export const DialogContent = React.forwardRef<
 
   return (
     <DialogPortal>
-      {/* Centered Modal Mandate: 100% viewport centering via grid place-items-center */}
-      <div className="fixed inset-0 z-50 grid place-items-center p-4 overflow-y-auto">
+      {/* Centered Modal Mandate: 100% viewport centering via grid place-items-center on top z-[100] layer */}
+      <div className="fixed inset-0 z-[100] grid place-items-center p-4 overflow-y-auto">
         <DialogOverlay onClick={handleClose} />
         <div
           ref={(node) => {
@@ -210,7 +210,7 @@ export const DialogContent = React.forwardRef<
           role="dialog"
           aria-modal="true"
           className={cn(
-            "relative z-50 w-full max-w-lg bg-card text-card-foreground rounded-lg border border-border shadow-lg p-6 max-h-[90dvh] overflow-y-auto transition-all animate-in fade-in-0 zoom-in-95",
+            "relative z-[101] w-full max-w-lg bg-card text-card-foreground rounded-2xl border border-border shadow-2xl p-6 max-h-[90dvh] overflow-y-auto transition-all animate-in fade-in-0 zoom-in-95",
             className
           )}
           {...props}

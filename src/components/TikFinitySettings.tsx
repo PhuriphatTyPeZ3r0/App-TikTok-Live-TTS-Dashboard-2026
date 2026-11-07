@@ -116,33 +116,28 @@ export function TikFinitySettings({
     onChangeTuning?.(voiceId, tuning);
   };
 
+  const currentTabDef = TABS.find((tab) => tab.id === currentTab);
+
   return (
     <div
-      className={`bg-[#12141a] border border-[#1e222d] rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col gap-5 ${className}`}
+      className={`bg-card text-card-foreground border border-border rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col gap-5 ${className}`}
     >
-      {/* Tabs Header with Cloud Sync Status Badge */}
-      <div className="flex items-center justify-between gap-3 border-b border-[#1e222d] pb-3.5">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth flex-nowrap flex-1 py-1">
-          {TABS.map((tab) => {
-            const isActive = currentTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => handleTabSelect(tab.id)}
-                className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 border whitespace-nowrap flex items-center gap-2 shrink-0 min-touch-target ${
-                  isActive
-                    ? "bg-[#fe2c55]/15 text-white border-[#fe2c55]/40 shadow-[0_0_12px_rgba(254,44,85,0.15)]"
-                    : "bg-transparent text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/[0.04]"
-                }`}
-              >
-                <span className="material-symbols-rounded text-base leading-none select-none">
-                  {tab.icon}
-                </span>
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
+      {/* Section Header with Active Sidebar Tab Indicator & Cloud Sync Status Badge */}
+      <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
+            <span className="material-symbols-rounded text-lg select-none">
+              {currentTabDef?.icon || "tune"}
+            </span>
+          </div>
+          <div>
+            <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
+              <span>{currentTabDef?.label || "การตั้งค่าระบบ (Studio Settings)"}</span>
+            </h2>
+            <p className="text-[11px] text-muted-foreground">
+              ควบคุมผ่านแถบนำทางหลัก (Controlled via Main Sidebar Navigation)
+            </p>
+          </div>
         </div>
 
         {/* Cloud Sync Status Badge */}

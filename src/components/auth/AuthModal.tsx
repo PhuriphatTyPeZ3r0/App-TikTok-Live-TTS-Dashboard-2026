@@ -471,6 +471,28 @@ export function AuthModal({
             )}
           </Button>
         </form>
+
+        {/* Compliance Footer: TikTok Login Kit & OpenID Policy */}
+        <div className="pt-2 border-t border-border/40 text-center text-[10px] text-muted-foreground space-x-1">
+          <span>By signing in, you agree to our</span>
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noreferrer"
+            className="text-foreground underline hover:text-primary transition-colors"
+          >
+            Terms of Service
+          </a>
+          <span>and</span>
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noreferrer"
+            className="text-foreground underline hover:text-primary transition-colors"
+          >
+            Privacy Policy
+          </a>
+        </div>
       </DialogContent>
     </Dialog>
   );

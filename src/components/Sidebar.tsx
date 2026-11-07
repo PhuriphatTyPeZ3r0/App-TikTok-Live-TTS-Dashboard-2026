@@ -43,6 +43,8 @@ import {
   Mic,
   Tv,
   Settings,
+  Gift,
+  Shield,
   ScrollText,
   X,
   Radio,
@@ -110,8 +112,18 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   },
   {
     id: "settings",
-    label: "ตั้งค่า (Settings)",
+    label: "ตั้งค่าแชท (Chat TTS)",
     icon: Settings,
+  },
+  {
+    id: "gift",
+    label: "ของขวัญ (Gift Alerts)",
+    icon: Gift,
+  },
+  {
+    id: "safety",
+    label: "ตัวกรองคำ (Safety & Filters)",
+    icon: Shield,
   },
   {
     id: "obs",

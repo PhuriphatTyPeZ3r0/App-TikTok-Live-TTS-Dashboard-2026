@@ -90,6 +90,10 @@ function TikFinityDashboardContent() {
       setSettingsSubtab("voices");
     } else if (tabId === "settings") {
       setSettingsSubtab("chat");
+    } else if (tabId === "gift") {
+      setSettingsSubtab("gift");
+    } else if (tabId === "safety") {
+      setSettingsSubtab("safety");
     } else if (tabId === "obs") {
       setSettingsSubtab("obs");
     } else if (tabId === "logs") {
@@ -965,10 +969,10 @@ function TikFinityDashboardContent() {
         </main>
       </div>
 
-      {/* Room Switcher Modal Dialog (100% Centered Viewport & Dynamic Viewport Height aware) */}
+      {/* Room Switcher Modal Dialog (100% Centered Viewport & Top Layer z-[100] / z-[101]) */}
       {showRoomModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md overflow-y-auto"
+          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setShowRoomModal(false);
@@ -977,7 +981,7 @@ function TikFinityDashboardContent() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="relative w-full max-w-md my-auto bg-[#12141a]/95 border border-[#1e222d] rounded-2xl p-5 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col gap-4 backdrop-blur-2xl modal-center-animate max-h-[calc(100dvh-2rem)] overflow-y-auto">
+          <div className="relative z-[101] w-full max-w-md my-auto bg-card text-card-foreground border border-border rounded-2xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4 backdrop-blur-2xl modal-center-animate max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <button
               type="button"
               onClick={() => setShowRoomModal(false)}
