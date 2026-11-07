@@ -55,7 +55,11 @@ function generateLogId(): string {
 async function dispatchRemoteTelemetry(entry: LogEntry): Promise<void> {
   // Asynchronous remote dispatch must never block client rendering or throw uncaught errors
   try {
-    const apiHost = process.env.NEXT_PUBLIC_API_URL?.trim() || '';
+    const apiHost = (
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      ''
+    ).trim().replace(/\/+$/, '');
     const ingestUrl = `${apiHost}/api/logs`;
 
     // 1. Post to FastAPI Backend Log Ingestion Endpoint
@@ -231,10 +235,15 @@ export function getLogs(filter?: LogFilter): LogEntry[] {
       const matchMessage = entry.message.toLowerCase().includes(query);
       let matchDetails = false;
       if (entry.details !== undefined && entry.details !== null) {
-        matchDetails = (typeof entry.details === 'string'
-          ? entry.details
-          : JSON.stringify(entry.details)
-        ).toLowerCase().includes(query);
+        try {
+          const serialized =
+            typeof entry.details === 'string'
+              ? entry.details
+              : JSON.stringify(entry.details);
+          matchDetails = serialized.toLowerCase().includes(query);
+        } catch {
+          matchDetails = String(entry.details).toLowerCase().includes(query);
+        }
       }
       if (!matchMessage && !matchDetails) {
         return false;
@@ -301,9 +310,15 @@ function registerGlobalBrowserErrorHandlers(): void {
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
     const reason = event.reason;
     const reasonMessage = reason instanceof Error ? reason.message : String(reason);
+    let safeReason: string;
+    try {
+      safeReason = typeof reason === 'object' ? JSON.stringify(reason) : String(reason);
+    } catch {
+      safeReason = String(reason);
+    }
     recordLogEntry('ERROR', 'SYSTEM', `Unhandled asynchronous Promise rejection: ${reasonMessage}`, {
       stack: reason instanceof Error ? reason.stack : undefined,
-      rawReason: typeof reason === 'object' ? JSON.stringify(reason) : String(reason),
+      rawReason: safeReason,
     });
   });
 }

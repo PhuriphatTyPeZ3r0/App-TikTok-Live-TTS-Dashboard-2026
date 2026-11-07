@@ -216,7 +216,7 @@ class LogEntryPayload(BaseModel):
     timestamp: Optional[str] = Field(default=None, description="ISO 8601 formatted timestamp string in UTC")
     level: LogLevelType = Field(..., description="Diagnostic severity level")
     category: LogCategoryType = Field(..., description="Subsystem functional category")
-    message: str = Field(..., min_length=1, description="Structured log message")
+    message: str = Field(..., min_length=1, max_length=5000, description="Structured log message")
     details: Optional[Any] = Field(default=None, description="Supplementary context or parameters")
     sessionId: Optional[str] = Field(default=None, description="Active live stream session identifier")
     userId: Optional[str] = Field(default=None, description="Supabase user UUID")
@@ -233,6 +233,11 @@ async def ingest_logs(
     UTC timestamps. Thread-safe using threading.Lock.
     """
     entries = payload if isinstance(payload, list) else [payload]
+    if len(entries) > 500:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Batch log ingestion exceeds maximum limit of 500 records per request.",
+        )
     now_utc = datetime.now(timezone.utc).isoformat()
 
     with log_buffer_lock:
