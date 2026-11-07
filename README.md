@@ -16,7 +16,7 @@ pinned: false
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/PhuriphatTyPeZ3r0/tiktok-live-tts-bot&root-directory=frontend)
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-256%20passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-309%20passed-success?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Cloudflare Tunnel](https://img.shields.io/badge/Cloudflare-Tunnel-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
 
@@ -63,6 +63,15 @@ pinned: false
 - **`GET /api/voices`**: ดึงรายการโปรไฟล์เสียงทั้งหมด 5 โปรไฟล์ พร้อมรายละเอียด Engine และสถานะ Default
 - **`POST /api/session/{session_id}/voice`** (และ `POST /api/session/voice`): เปลี่ยนโปรไฟล์เสียงของเซสชันปัจจุบัน (ต้องใช้ `admin_token`) และกระจายสัญญาณ `VOICE_CHANGED` ไปยังทุก Dashboard และ Overlay ที่เชื่อมต่ออยู่
 - **WebSocket Action `set_voice`**: ส่งคำสั่ง `{"action": "set_voice", "voice_id": "hana"}` ผ่าน `/ws/dashboard/{session_id}` เพื่อสลับเสียงแบบไร้รอยต่อ (Zero-Latency Switching)
+
+### 5. 🛡️ Supabase Authentication, 3-Tier RBAC & Real-Time Log Monitor
+- **3-Tier Role-Based Access Control (RBAC):** กำหนดระดับสิทธิ์การเข้าถึงอย่างเคร่งครัดบน PostgreSQL (`public.user_profiles`) ผ่าน Row Level Security (RLS) และ Trigger ป้องกันการยกระดับสิทธิ์ (`prevent_role_escalation`):
+  * `admin`: สิทธิ์ผู้ดูแลระบบสูงสุด สามารถตรวจสอบประวัติการทำงานและ System Telemetry ทั้งหมดของระบบ
+  * `streamer`: สิทธิ์ผู้ถ่ายทอดสด สามารถจัดการโปรไฟล์ คอนฟิกเสียงพากย์ และซิงก์การตั้งค่าส่วนบุคคล
+  * `viewer`: สิทธิ์ผู้ชมทั่วไป สำหรับเปิดดูหน้าจอ OBS Browser Source Overlay แบบ Read-Only
+- **Debounced Cloud Settings Sync (`useSupabaseSync`):** ซิงก์ค่าการปรับแต่งเสียง (`voice_tunings`), เสียงพากย์ที่เลือก (`selected_voice_id`), และการตั้งค่า TikFinity Settings ขึ้นสู่ Supabase Cloud โดยอัตโนมัติด้วยดีเลย์ 1000ms พร้อมระบบตรวจจับการเปลี่ยนแปลงแบบลูปป้องกัน (Loop Prevention)
+- **In-Dashboard Real-Time Log Monitor (Tab 6):** หน้าต่างสังเกตการณ์ระบบถ่ายทอดสดและตรวจจับข้อผิดพลาดแบบเรียลไทม์ผ่าน Circular Ring Buffer (500 รายการ) ตัวกรองระดับความรุนแรง (`ALL`, `ERROR`, `WARN`, `INFO`, `DEBUG`), ตัวกรอง Subsystem (`TTS`, `TIKTOK_WS`, `AUTH`, `NETWORK`, `OVERLAY`, `SYSTEM`), ค้นหาข้อความสด, Export ไฟล์ JSON, และโหมดดึงข้อมูล Remote Backend Telemetry สำหรับผู้ดูแลระบบ
+- **Resilient Local Offline Fallback:** ทำงานได้อย่างสมบูรณ์แบบในโหมดโลคอลและออฟไลน์ แม้ยังไม่ได้ใส่ Supabase API Keys ระบบจะไม่ Error หรือบล็อกการใช้งานสตรีมเมอร์
 
 ---
 
@@ -280,13 +289,17 @@ MIN_GIFT_COINS=1
 
 # Emergency Hotkey (Operating System Global)
 EMERGENCY_HOTKEY=f9
+
+# Supabase Authentication & RBAC (Optional - Falls back to local offline mode)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ```
 
 ---
 
 ## 🧪 Testing & Automated Verification
 
-ระบบได้รับการพัฒนาภายใต้ระเบียบวิธี Test-Driven Development (TDD) ครอบคลุม Unit Tests, PyThaiNLP Speech Normalization Tests, Multi-Voice Registry Tests, Contract Tests, WebSocket Tests และ End-to-End (E2E) Pipeline Verification รวมทั้งสิ้น 256 การทดสอบ:
+ระบบได้รับการพัฒนาภายใต้ระเบียบวิธี Test-Driven Development (TDD) ครอบคลุม Unit Tests, PyThaiNLP Speech Normalization Tests, Multi-Voice Registry Tests, Contract Tests, WebSocket Tests, Supabase RBAC & Client Tests, Structured Logger Ingest Tests, Cloud Sync Tests, Log Monitor Tests และ End-to-End (E2E) Pipeline Verification รวมทั้งสิ้น 309 การทดสอบ (100% Pass Rate):
 
 ```powershell
 # รันการทดสอบทั้งหมดผ่าน pytest
