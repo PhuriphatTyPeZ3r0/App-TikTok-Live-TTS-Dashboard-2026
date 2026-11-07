@@ -20,7 +20,8 @@
 import React, { Suspense, useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Navbar } from "../components/Navbar";
-import { TikFinitySettings } from "../components/TikFinitySettings";
+import { Sidebar } from "../components/Sidebar";
+import { TikFinitySettings, type SettingsTabId } from "../components/TikFinitySettings";
 import { LiveQueueConsole } from "../components/LiveQueueConsole";
 import { useTikFinitySettings } from "../hooks/useTikFinitySettings";
 import { useSupabaseSync } from "../hooks/useSupabaseSync";
@@ -64,6 +65,46 @@ function TikFinityDashboardContent() {
   const [inputUsername, setInputUsername] = useState<string>("");
   const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
   const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
+
+  // Responsive Sidebar & Active Navigation state
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const [activeNavTab, setActiveNavTab] = useState<string>("cockpit");
+  const [settingsSubtab, setSettingsSubtab] = useState<SettingsTabId>("chat");
+
+  // Escape key handler for Room Switcher modal
+  useEffect(() => {
+    if (!showRoomModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowRoomModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showRoomModal]);
+
+  const handleSelectNavTab = (tabId: string) => {
+    setActiveNavTab(tabId);
+    if (tabId === "voice") {
+      setSettingsSubtab("voices");
+    } else if (tabId === "settings") {
+      setSettingsSubtab("chat");
+    } else if (tabId === "obs") {
+      setSettingsSubtab("obs");
+    } else if (tabId === "logs") {
+      setSettingsSubtab("logs");
+    }
+    if (typeof window !== "undefined") {
+      if (tabId === "queue") {
+        const el = document.getElementById("live-queue-section");
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      } else {
+        const el = document.getElementById("settings-section");
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
 
   // TikFinity Settings Hook
   const { settings, updateSettings, isLoaded: settingsLoaded } = useTikFinitySettings();
@@ -837,7 +878,7 @@ function TikFinityDashboardContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0b0e] text-slate-100 flex flex-col font-sans selection:bg-[#fe2c55]/30 selection:text-white">
+    <div className="min-h-screen min-h-[100dvh] bg-[#0a0b0e] text-slate-100 flex flex-col font-sans selection:bg-[#fe2c55]/30 selection:text-white">
       {/* StreamVox Live Sticky Top Navigation Bar */}
       <Navbar
         username={username}
@@ -853,49 +894,90 @@ function TikFinityDashboardContent() {
         selectedVoiceId={selectedVoiceId}
         onOpenRoomModal={() => setShowRoomModal(true)}
         onSwitchAccount={() => setShowRoomModal(true)}
+        onToggleSidebar={() => {
+          if (typeof window !== "undefined" && window.innerWidth < 768) {
+            setIsMobileSidebarOpen((prev) => !prev);
+          } else {
+            setIsSidebarCollapsed((prev) => !prev);
+          }
+        }}
       />
 
-      {/* Main 2-Column Master Console Layout */}
-      <main className="max-w-[1540px] mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-6 w-full flex-1">
-        {/* Left Column (1.15fr): StreamVox & TikFinity Tabbed Settings Panel */}
-        <TikFinitySettings
-          settings={settings}
-          onUpdate={updateSettings}
-          onSelectVoice={syncVoiceWithBackend}
-          onChangeTuning={handleChangeVoiceTuning}
-          onTestVoice={handleTestSpecificVoice}
-          backendUrl={backendUrl}
-          testingVoiceId={testingVoiceId}
-          sessionId={sessionId}
-          overlayToken={overlayToken}
-          isSyncing={isSyncing}
-          isCloudSyncActive={isCloudSyncActive}
-          lastSyncedAt={lastSyncedAt}
-          syncError={syncError}
-          onManualSync={manualSync}
+      <div className="flex flex-1 w-full relative">
+        {/* StreamVox Live Responsive Hybrid Sidebar */}
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          activeTab={activeNavTab}
+          onSelectTab={handleSelectNavTab}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
-        {/* Right Column (0.85fr): Live Queue & Playback Console */}
-        <LiveQueueConsole
-          currentSpeaker={currentSpeaker}
-          isPlaying={isPlaying}
-          isPaused={isPaused}
-          queue={queue}
-          onSkip={handleSkip}
-          onTogglePause={handleTogglePause}
-          onClearQueue={handleClearQueue}
-          onDeleteItem={handleDeleteItem}
-        />
-      </main>
+        {/* Main 2-Column Master Console Layout with Bento Grid & Safe Area Padding */}
+        <main className="flex-1 w-full min-w-0 p-3 sm:p-4 md:p-6 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))]">
+          <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-4 sm:gap-6 w-full">
+            {/* Left Column: StreamVox & TikFinity Tabbed Settings Panel */}
+            <div id="settings-section" className="w-full">
+              <TikFinitySettings
+                activeTab={settingsSubtab}
+                onTabChange={(tab) => {
+                  setSettingsSubtab(tab);
+                  if (tab === "voices") setActiveNavTab("voice");
+                  else if (tab === "obs") setActiveNavTab("obs");
+                  else if (tab === "logs") setActiveNavTab("logs");
+                  else setActiveNavTab("settings");
+                }}
+                settings={settings}
+                onUpdate={updateSettings}
+                onSelectVoice={syncVoiceWithBackend}
+                onChangeTuning={handleChangeVoiceTuning}
+                onTestVoice={handleTestSpecificVoice}
+                backendUrl={backendUrl}
+                testingVoiceId={testingVoiceId}
+                sessionId={sessionId}
+                overlayToken={overlayToken}
+                isSyncing={isSyncing}
+                isCloudSyncActive={isCloudSyncActive}
+                lastSyncedAt={lastSyncedAt}
+                syncError={syncError}
+                onManualSync={manualSync}
+              />
+            </div>
 
-      {/* Room Switcher Modal Dialog */}
+            {/* Right Column: Live Queue & Playback Console */}
+            <div id="live-queue-section" className="w-full">
+              <LiveQueueConsole
+                currentSpeaker={currentSpeaker}
+                isPlaying={isPlaying}
+                isPaused={isPaused}
+                queue={queue}
+                onSkip={handleSkip}
+                onTogglePause={handleTogglePause}
+                onClearQueue={handleClearQueue}
+                onDeleteItem={handleDeleteItem}
+              />
+            </div>
+          </div>
+        </main>
+      </div>
+
+      {/* Room Switcher Modal Dialog (100% Centered Viewport & Dynamic Viewport Height aware) */}
       {showRoomModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md bg-[#12141a] border border-[#1e222d] rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md overflow-y-auto"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowRoomModal(false);
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative w-full max-w-md my-auto bg-[#12141a]/95 border border-[#1e222d] rounded-2xl p-5 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85)] flex flex-col gap-4 backdrop-blur-2xl modal-center-animate max-h-[calc(100dvh-2rem)] overflow-y-auto">
             <button
               type="button"
               onClick={() => setShowRoomModal(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors min-touch-target flex items-center justify-center"
               aria-label="Close dialog"
             >
               <X className="w-5 h-5" />

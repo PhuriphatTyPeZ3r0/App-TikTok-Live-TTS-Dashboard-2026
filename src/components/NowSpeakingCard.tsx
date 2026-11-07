@@ -226,13 +226,13 @@ export function NowSpeakingCard({
       )}
 
       {/* Action Buttons Row */}
-      <div className="flex items-center gap-2 pt-3 border-t border-slate-800/80">
+      <div className="flex items-center gap-2 pt-3 border-t border-slate-800/80 flex-wrap">
         {/* Skip */}
         <button
           type="button"
           onClick={onSkip}
           disabled={!currentSpeaker}
-          className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm"
+          className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm min-touch-target min-h-[44px]"
           title="ข้ามข้อความปัจจุบัน (Skip)"
         >
           <span className="material-symbols-rounded text-base leading-none select-none">
@@ -246,7 +246,7 @@ export function NowSpeakingCard({
           type="button"
           onClick={onTogglePause}
           disabled={!currentSpeaker}
-          className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm border ${
+          className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm border min-touch-target min-h-[44px] ${
             isPaused
               ? "bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25"
               : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600"
@@ -263,7 +263,7 @@ export function NowSpeakingCard({
         <button
           type="button"
           onClick={onClearQueue}
-          className="ml-auto px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm"
+          className="ml-auto px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/30 hover:border-rose-500/50 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm min-touch-target min-h-[44px]"
           title="ล้างคิวทั้งหมด (Clear Queue)"
         >
           <span className="material-symbols-rounded text-base leading-none select-none">

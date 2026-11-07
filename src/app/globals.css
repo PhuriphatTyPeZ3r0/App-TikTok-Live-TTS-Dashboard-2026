@@ -26,6 +26,18 @@ body {
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   overflow-x: hidden;
   min-height: 100vh;
+  min-height: 100dvh;
+}
+
+@keyframes modalScaleIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 @layer utilities {
@@ -45,5 +57,40 @@ body {
     background: radial-gradient(circle at 15% 15%, rgba(0, 242, 254, 0.12), transparent 45%),
                 radial-gradient(circle at 85% 85%, rgba(254, 44, 85, 0.10), transparent 50%),
                 radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02), transparent 70%);
+  }
+
+  /* Viewport Centered Modal Scale Animation */
+  .modal-center-animate {
+    animation: modalScaleIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    will-change: transform, opacity;
+  }
+
+  /* Safe Area Inset Utility Classes for Apple iPhone/iPad and Samsung One UI */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+  .pr-safe {
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
+  /* Minimum 44x44px Touch Target per Apple HIG & Samsung One UI Guidelines */
+  .min-touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Touch-friendly Horizontal Scroll without Scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }

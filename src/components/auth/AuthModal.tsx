@@ -207,7 +207,7 @@ export function AuthModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md transition-opacity"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md transition-opacity overflow-y-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="auth-modal-title"
@@ -217,7 +217,7 @@ export function AuthModal({
         }
       }}
     >
-      <div className="relative w-full max-w-md bg-[#12141a]/95 border border-[#1e222d] hover:border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] p-6 sm:p-7 backdrop-blur-xl text-slate-100 transition-all">
+      <div className="relative w-full max-w-md my-auto bg-[#12141a]/95 border border-[#1e222d] hover:border-white/15 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] p-5 sm:p-7 backdrop-blur-2xl text-slate-100 transition-all modal-center-animate max-h-[calc(100dvh-2rem)] overflow-y-auto">
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-[#1e222d]">
           <div className="flex items-center gap-2.5">

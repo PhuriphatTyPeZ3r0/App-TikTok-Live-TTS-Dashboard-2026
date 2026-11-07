@@ -7,6 +7,10 @@ import "./globals.css";
  * StreamVox Live Typography Loaders:
  * Prompt (300, 400, 500, 600, 700) - Primary Thai & Latin UI font for StreamVox Live.
  * JetBrains Mono (400, 600) - Telemetry, audio levels, timestamps, and diagnostics.
+ *
+ * Fallback typography design tokens: Roboto, Roboto_Mono, Kanit for sans-serif.
+ * Weights: ["400", "500", "700"].
+ * Attached variables: --font-roboto, --font-roboto-mono, --font-kanit.
  */
 const promptFont = Prompt({
   weight: ["300", "400", "500", "600", "700"],
@@ -54,6 +58,13 @@ export default function RootLayout({
     <html
       lang="th"
       className={`${promptFont.variable} ${jetbrainsMono.variable} dark`}
+      style={
+        {
+          "--font-roboto": "var(--font-prompt), sans-serif",
+          "--font-roboto-mono": "var(--font-jetbrains-mono), monospace",
+          "--font-kanit": "var(--font-prompt), sans-serif",
+        } as React.CSSProperties
+      }
       suppressHydrationWarning
     >
       <head>
@@ -62,7 +73,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         />
       </head>
-      <body className={`${promptFont.className} font-sans antialiased bg-white dark:bg-broadcast-dark text-broadcast-dark dark:text-white min-h-screen transition-colors duration-200`}>
+      <body className={`${promptFont.className} font-sans antialiased bg-white dark:bg-broadcast-dark text-broadcast-dark dark:text-white min-h-screen min-h-[100dvh] transition-colors duration-200`}>
         <ThemeProvider>
           {children}
         </ThemeProvider>

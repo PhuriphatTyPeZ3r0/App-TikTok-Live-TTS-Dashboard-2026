@@ -157,7 +157,7 @@ export function QueueFeed({
                 <button
                   type="button"
                   onClick={() => handleDeleteItem(item.id)}
-                  className="w-7 h-7 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/15 flex items-center justify-center transition-colors text-xs font-bold shrink-0 border border-transparent hover:border-rose-500/20 active:scale-95"
+                  className="w-8 h-8 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/15 flex items-center justify-center transition-colors text-xs font-bold shrink-0 border border-transparent hover:border-rose-500/30 active:scale-95"
                   title="ลบออกจากคิว (Delete)"
                   aria-label={`ลบข้อความของ ${username} ออกจากคิว`}
                 >

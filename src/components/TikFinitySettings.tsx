@@ -46,6 +46,10 @@ export interface TikFinitySettingsProps {
   sessionId?: string;
   overlayToken?: string;
   className?: string;
+  /** Active subtab id when controlled externally (e.g. from Sidebar). */
+  activeTab?: SettingsTabId;
+  /** Callback invoked when the active subtab changes. */
+  onTabChange?: (tab: SettingsTabId) => void;
   /** Whether cloud synchronization is actively persisting updates. */
   isSyncing?: boolean;
   /** Whether cloud synchronization is active (authenticated session with Supabase). */
@@ -84,13 +88,22 @@ export function TikFinitySettings({
   sessionId,
   overlayToken = "",
   className = "",
+  activeTab: controlledTab,
+  onTabChange,
   isSyncing = false,
   isCloudSyncActive = false,
   lastSyncedAt = null,
   syncError = null,
   onManualSync,
 }: TikFinitySettingsProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTabId>("chat");
+  const [internalTab, setInternalTab] = useState<SettingsTabId>("chat");
+  const currentTab = controlledTab !== undefined ? controlledTab : internalTab;
+  const activeTab = currentTab;
+
+  const handleTabSelect = (tabId: SettingsTabId) => {
+    setInternalTab(tabId);
+    onTabChange?.(tabId);
+  };
 
   const handleVoiceChange = (voiceId: string) => {
     onUpdate({ selectedVoiceId: voiceId });
@@ -105,21 +118,21 @@ export function TikFinitySettings({
 
   return (
     <div
-      className={`bg-[#12141a] border border-[#1e222d] rounded-2xl p-5 shadow-2xl flex flex-col gap-5 ${className}`}
+      className={`bg-[#12141a] border border-[#1e222d] rounded-2xl p-4 sm:p-5 shadow-2xl flex flex-col gap-5 ${className}`}
     >
       {/* Tabs Header with Cloud Sync Status Badge */}
       <div className="flex items-center justify-between gap-3 border-b border-[#1e222d] pb-3.5">
-        <div className="flex gap-2 overflow-x-auto scrollbar-none flex-1">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth flex-nowrap flex-1 py-1">
           {TABS.map((tab) => {
-            const isActive = activeTab === tab.id;
+            const isActive = currentTab === tab.id;
             return (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200 border whitespace-nowrap flex items-center gap-2 ${
+                onClick={() => handleTabSelect(tab.id)}
+                className={`px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 border whitespace-nowrap flex items-center gap-2 shrink-0 min-touch-target ${
                   isActive
-                    ? "bg-[#fe2c55]/10 text-white border-[#fe2c55]/40 shadow-[0_0_12px_rgba(254,44,85,0.15)]"
+                    ? "bg-[#fe2c55]/15 text-white border-[#fe2c55]/40 shadow-[0_0_12px_rgba(254,44,85,0.15)]"
                     : "bg-transparent text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/[0.04]"
                 }`}
               >

@@ -5,6 +5,7 @@
  *
  * Implements StreamVox Live broadcast studio header design:
  * - Brand logo with Google Material Symbols (`graphic_eq`) in pink/cyan gradient box
+ * - Hamburger drawer toggle button (`Menu`) for responsive mobile/tablet sidebar drawer
  * - Title: "StreamVox Live" with `v2.1 PRO` pill badge
  * - Subtitle: "TikTok Live Text-to-Speech (TTS) Studio • PyThaiNLP & Multi-Voice Powered"
  * - Status badges:
@@ -12,7 +13,8 @@
  *     - Active Voice profile badge: `record_voice_over {activeEngine}`
  * - Quick Voice Test button with Google Material Symbols (`volume_up`) and loading indicator
  * - TTS Master toggle switch (masterTtsEnabled / onToggleMaster)
- * - Optional theme toggler and account/room switcher
+ * - Touch targets >= 44x44px for Apple iOS & Samsung One UI ergonomics
+ * - Safe area top padding for iPhone Dynamic Island and Samsung front camera notch
  *
  * Voice Actor Attribution: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
  * Architecture: Single-Page Application (SPA) communicating with Asynchronous Server Gateway Interface (ASGI)
@@ -20,7 +22,7 @@
  */
 
 import React, { useState } from "react";
-import { Loader2, Sun, Moon, User } from "lucide-react";
+import { Loader2, Sun, Moon, User, Menu } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 import { UserProfileButton } from "./auth/UserProfileButton";
 import { AuthModal } from "./auth/AuthModal";
@@ -91,6 +93,7 @@ export function Navbar({
   onOpenRoomModal,
   onSwitchAccount,
   onOpenOBSPreview,
+  onToggleSidebar,
   onOpenAuthModal,
   className = "",
 }: NavbarProps): React.JSX.Element {
@@ -106,35 +109,29 @@ export function Navbar({
     VOICE_BADGE_LABELS[selectedVoiceId] ||
     "Fish Audio (คุณพิพัฒน์ บุญสิทธิเลิศ)";
 
-  // OBS Overlay URL calculation
-  const cleanBackendUrl = (backendUrl || "").replace(/\/+$/, "");
-  const encodedSessionId = encodeURIComponent(sessionId || "");
-  const overlayUrl = overlayToken
-    ? `${cleanBackendUrl}/overlay/${encodedSessionId}?token=${encodeURIComponent(overlayToken)}`
-    : `${cleanBackendUrl}/overlay/${encodedSessionId}`;
-
-  const handleCopyOverlay = async () => {
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard) {
-        await navigator.clipboard.writeText(overlayUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2500);
-      }
-    } catch (err) {
-      console.error("Failed to copy OBS overlay URL:", err);
-    }
-  };
-
   return (
     <header
-      className={`sticky top-0 z-50 w-full bg-[#12141a]/95 backdrop-blur-md border-b border-[#1e222d] px-4 md:px-6 py-3 shadow-lg flex items-center justify-between gap-4 transition-colors ${className}`}
+      className={`sticky top-0 z-50 w-full bg-[#12141a]/95 backdrop-blur-md border-b border-[#1e222d] px-3 sm:px-4 md:px-6 py-2.5 sm:py-3 pt-[calc(0.625rem+env(safe-area-inset-top,0px))] shadow-lg flex items-center justify-between gap-2.5 sm:gap-4 transition-colors ${className}`}
       aria-label="StreamVox Live Master Navigation Bar"
     >
-      {/* Left Section: Brand Logo & Title */}
-      <div className="flex items-center gap-3 shrink-0">
+      {/* Left Section: Brand Logo & Title & Sidebar Toggle */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-95 border border-[#1e222d] text-slate-300 hover:text-white transition-all min-touch-target shrink-0"
+            aria-label="Toggle navigation menu"
+            title="เปิด/ปิดเมนูนำทาง (Toggle Sidebar)"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
         <div
-          className="w-[38px] h-[38px] rounded-lg bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center font-extrabold text-black text-lg select-none shadow-md shrink-0"
+          className="w-[38px] h-[38px] rounded-lg bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center font-extrabold text-black text-lg select-none shadow-md shrink-0 cursor-pointer"
           title="StreamVox Live TTS Console"
+          onClick={onToggleSidebar}
         >
           <span className="material-symbols-rounded text-xl text-black select-none">
             graphic_eq
@@ -149,35 +146,35 @@ export function Navbar({
               v2.1 PRO
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 font-normal hidden sm:block">
+          <p className="text-[11px] text-slate-400 font-normal hidden lg:block">
             TikTok Live TTS Stream Console • PyThaiNLP &amp; Multi-Voice Studio
           </p>
         </div>
       </div>
 
       {/* Right Section: Badges, Controls, Master Switch */}
-      <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 flex-wrap justify-end">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
         {/* Live Badge with Pulsing Dot */}
         <div
-          className="flex items-center gap-2 bg-[#fe2c55]/15 border border-[#fe2c55]/30 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#fe2c55] shadow-[0_0_12px_rgba(254,44,85,0.15)] cursor-pointer hover:bg-[#fe2c55]/20 transition-colors"
+          className="flex items-center gap-2 bg-[#fe2c55]/15 border border-[#fe2c55]/30 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#fe2c55] shadow-[0_0_12px_rgba(254,44,85,0.15)] cursor-pointer hover:bg-[#fe2c55]/20 transition-colors min-h-[38px]"
           onClick={onSwitchAccount || onOpenRoomModal}
           title={`TikTok Live: @${displayUser} (คลิกเพื่อเปลี่ยนห้อง)`}
         >
           <span className="w-2 h-2 rounded-full bg-[#fe2c55] animate-pulse shadow-[0_0_8px_#fe2c55]" />
-          <span className="truncate max-w-[140px] sm:max-w-[200px]">
+          <span className="truncate max-w-[110px] sm:max-w-[180px]">
             LIVE: @{displayUser}
           </span>
         </div>
 
-        {/* Voice Engine Badge */}
+        {/* Voice Engine Badge (hidden on mobile, visible on desktop) */}
         <div
-          className="hidden md:flex items-center gap-1.5 bg-[#25f4ee]/10 border border-[#25f4ee]/25 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#25f4ee] shadow-sm"
+          className="hidden xl:flex items-center gap-1.5 bg-[#25f4ee]/10 border border-[#25f4ee]/25 px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#25f4ee] shadow-sm min-h-[38px]"
           title={`Active Voice Engine: ${resolvedEngineLabel}`}
         >
           <span className="material-symbols-rounded text-base select-none">
             record_voice_over
           </span>
-          <span className="truncate max-w-[240px]">{resolvedEngineLabel}</span>
+          <span className="truncate max-w-[220px]">{resolvedEngineLabel}</span>
         </div>
 
         {/* Quick Voice Test Button */}
@@ -186,11 +183,11 @@ export function Navbar({
             type="button"
             onClick={onTestVoice}
             disabled={isTestingVoice}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] text-slate-200 hover:text-white transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-sm"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] text-slate-200 hover:text-white transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none shadow-sm min-touch-target"
             title="ทดสอบระบบเสียงสังเคราะห์ (Quick Voice Test)"
           >
             {isTestingVoice ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#25f4ee]" />
+              <Loader2 className="w-4 h-4 animate-spin text-[#25f4ee]" />
             ) : (
               <span className="material-symbols-rounded text-base text-[#25f4ee] select-none">
                 volume_up
@@ -203,9 +200,9 @@ export function Navbar({
         )}
 
         {/* TTS Master Toggle Switch */}
-        <div className="flex items-center gap-2.5 bg-[#181b24] border border-[#1e222d] px-3 py-1.5 rounded-lg shadow-sm">
-          <span className="text-xs font-semibold text-slate-200 whitespace-nowrap select-none">
-            TTS Master
+        <div className="flex items-center gap-2 bg-[#181b24] border border-[#1e222d] px-2.5 sm:px-3 py-1.5 rounded-xl shadow-sm min-touch-target">
+          <span className="text-[11px] sm:text-xs font-semibold text-slate-200 whitespace-nowrap select-none hidden xs:inline">
+            Master
           </span>
           <label className="relative inline-flex items-center cursor-pointer select-none">
             <input
@@ -223,7 +220,7 @@ export function Navbar({
         <button
           type="button"
           onClick={toggleTheme}
-          className="p-2 rounded-lg bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] text-slate-300 hover:text-white transition-colors"
+          className="w-10 h-10 rounded-xl bg-[#181b24] hover:bg-[#222734] border border-[#1e222d] text-slate-300 hover:text-white transition-colors flex items-center justify-center min-touch-target"
           title={
             theme === "dark"
               ? "เปลี่ยนเป็นโหมดสว่าง (Light Mode)"
@@ -242,7 +239,7 @@ export function Navbar({
         <button
           type="button"
           onClick={onSwitchAccount || onOpenRoomModal}
-          className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-800 to-slate-700 border border-[#1e222d] flex items-center justify-center text-slate-200 hover:text-white font-medium text-xs shadow-sm hover:ring-2 hover:ring-[#25f4ee]/40 transition-all shrink-0"
+          className="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-[#1e222d] flex items-center justify-center text-slate-200 hover:text-white font-medium text-xs shadow-sm hover:ring-2 hover:ring-[#25f4ee]/40 transition-all shrink-0 min-touch-target"
           title={`เปลี่ยนห้อง TikTok LIVE: @${displayUser}`}
           aria-label="Change live stream room"
         >
