@@ -134,9 +134,6 @@ export function TikFinitySettings({
             <h2 className="text-sm sm:text-base font-semibold text-foreground flex items-center gap-2">
               <span>{currentTabDef?.label || "การตั้งค่าระบบ (Studio Settings)"}</span>
             </h2>
-            <p className="text-[11px] text-muted-foreground">
-              ควบคุมผ่านแถบนำทางหลัก (Controlled via Main Sidebar Navigation)
-            </p>
           </div>
         </div>
 

@@ -145,9 +145,6 @@ export function ControlPanel({
             <h2 className="text-sm font-semibold tracking-wide text-neutral-900 dark:text-white">
               แผงควบคุมหลัก (Streamer Cockpit)
             </h2>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-              ควบคุมระดับเสียง ตัวกรองเหตุการณ์ และปุ่มปฏิบัติการด่วน
-            </p>
           </div>
         </div>
       </div>

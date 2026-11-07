@@ -46,8 +46,6 @@ export interface UseSupabaseAuthReturn {
   ) => Promise<{ error: Error | null }>;
   /** Initiates Google Single Sign-On (SSO) OpenID Connect authentication flow. */
   signInWithGoogle: () => Promise<{ error: Error | null }>;
-  /** Initiates TikTok Single Sign-On (SSO) OAuth authentication flow. */
-  signInWithTikTok: () => Promise<{ error: Error | null }>;
   /** Terminates the active Supabase authentication session. */
   signOut: () => Promise<{ error: Error | null }>;
   /** Manually re-fetches user profile metadata from PostgreSQL public.user_profiles. */
@@ -433,41 +431,6 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
     }
   }, []);
 
-  // Sign In with TikTok Single Sign-On (SSO) OAuth
-  const signInWithTikTok = useCallback(async (): Promise<{ error: Error | null }> => {
-    const client = getSupabaseBrowserClient();
-    if (!client || !isSupabaseConfigured()) {
-      const error = new Error('Supabase authentication is not configured in this environment.');
-      logger.warn('AUTH', 'TikTok SSO invocation rejected: Supabase is not configured');
-      return { error };
-    }
-
-    try {
-      const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
-      // TikTok OAuth provider integration via Supabase OAuth endpoint
-      const { error } = await client.auth.signInWithOAuth({
-        provider: 'tiktok' as any,
-        options: {
-          redirectTo,
-        },
-      });
-
-      if (error) {
-        logger.error('AUTH', 'TikTok Single Sign-On (SSO) OAuth initialization failed', {
-          errorMessage: error.message,
-        });
-        return { error: new Error(error.message) };
-      }
-
-      logger.info('AUTH', 'TikTok Single Sign-On (SSO) OAuth initiated successfully');
-      return { error: null };
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unexpected TikTok SSO error';
-      logger.error('AUTH', 'Unexpected exception during TikTok SSO initialization', { error: msg });
-      return { error: new Error(msg) };
-    }
-  }, []);
-
   // Sign Out from active session
   const signOut = useCallback(async (): Promise<{ error: Error | null }> => {
     const client = getSupabaseBrowserClient();
@@ -512,7 +475,6 @@ export function useSupabaseAuth(): UseSupabaseAuthReturn {
     signInWithPassword,
     signUp,
     signInWithGoogle,
-    signInWithTikTok,
     signOut,
     refreshProfile,
   };

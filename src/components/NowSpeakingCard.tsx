@@ -182,9 +182,6 @@ export function NowSpeakingCard({
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                {isGift ? "ส่งของขวัญสนับสนุนสตรีมเมอร์" : "แชทสด TikTok LIVE"}
-              </p>
             </div>
           </div>
 
@@ -218,9 +215,6 @@ export function NowSpeakingCard({
           </div>
           <p className="text-sm font-semibold text-slate-200">
             รอข้อความจาก TikTok LIVE...
-          </p>
-          <p className="text-xs text-slate-400 mt-1 max-w-sm">
-            เมื่อมีข้อความแชทหรือของขวัญเข้ามา ระบบจะสังเคราะห์เสียงและเล่นออกอากาศสดทันที
           </p>
         </div>
       )}

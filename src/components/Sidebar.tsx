@@ -224,17 +224,12 @@ export function Sidebar({
                     graphic_eq
                   </span>
                 </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-1.5">
-                    <span className="self-center text-sm font-bold tracking-tight text-foreground whitespace-nowrap">
-                      StreamVox Live
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-primary/15 text-primary border border-primary/25">
-                      PRO
-                    </span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground truncate">
-                    TikTok Live TTS Studio
+                <div className="flex items-center gap-1.5">
+                  <span className="self-center text-sm font-bold tracking-tight text-foreground whitespace-nowrap">
+                    StreamVox Live
+                  </span>
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-primary/15 text-primary border border-primary/25">
+                    PRO
                   </span>
                 </div>
               </a>
@@ -296,23 +291,18 @@ export function Sidebar({
           </div>
 
           {/* Bottom Attribution & System Status Card */}
-          <div className="pt-4 border-t border-border mt-auto">
-            <div className="p-3 rounded-xl bg-muted/40 border border-border text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5 font-semibold text-foreground mb-1">
+          <div className="pt-3 border-t border-border mt-auto">
+            <div className="px-3 py-2 rounded-xl bg-muted/40 border border-border flex items-center justify-between text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5 font-medium text-foreground">
                 <Radio
                   className={cn(
-                    "w-3.5 h-3.5",
+                    "w-3 h-3",
                     isStreaming ? "text-destructive animate-pulse" : "text-muted-foreground"
                   )}
                 />
-                <span className="text-xs">StreamVox Live PRO</span>
+                <span className="text-[11px] truncate">คุณพิพัฒน์ บุญสิทธิเลิศ</span>
               </div>
-              <div className="text-[11px] text-foreground/80 truncate">
-                เสียงพากย์: คุณพิพัฒน์ บุญสิทธิเลิศ
-              </div>
-              <div className="font-mono text-[10px] text-muted-foreground mt-1">
-                v2.1 • Flowbite Layout Standard
-              </div>
+              <span className="text-[10px] font-mono font-bold text-primary">v2.1</span>
             </div>
           </div>
         </div>

@@ -45,24 +45,24 @@ export default function PrivacyPolicyPage() {
               <span>1. Overview &amp; Scope</span>
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              StreamVox Live (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides real-time Text-to-Speech (TTS) speech synthesis and live broadcast telemetry tools for TikTok content creators and live streamers. This Privacy Policy outlines how we collect, handle, protect, and process user credentials and profile data when you interact with StreamVox Live, including authentication via TikTok Login Kit and Google Single Sign-On (SSO).
+              StreamVox Live (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides real-time Text-to-Speech (TTS) speech synthesis and live broadcast telemetry tools for live streamers. This Privacy Policy outlines how we collect, handle, protect, and process user credentials and profile data when you interact with StreamVox Live, including authentication via Google Single Sign-On (SSO).
             </p>
           </section>
 
           <section className="p-5 rounded-2xl bg-card border border-border space-y-3">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <Lock className="w-4 h-4 text-primary" />
-              <span>2. Data We Collect Through TikTok Login Kit</span>
+              <span>2. Data We Collect Through Google Single Sign-On (SSO)</span>
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              When you authenticate with StreamVox Live using TikTok Login Kit, we request explicit user authorization for the following scopes under the Open Authorization (OAuth) 2.0 Proof Key for Code Exchange (PKCE) protocol:
+              When you authenticate with StreamVox Live using Google SSO, we request explicit user authorization under the Open Authorization (OAuth) 2.0 Proof Key for Code Exchange (PKCE) protocol:
             </p>
             <ul className="list-disc pl-5 text-xs sm:text-sm text-muted-foreground space-y-1.5">
               <li>
-                <strong className="text-foreground">user.info.basic:</strong> Unique OpenID (an anonymized creator identifier), public display moniker (name), and profile avatar image URL.
+                <strong className="text-foreground">Profile &amp; Email:</strong> Unique Google account identifier, email address, public display name, and avatar URL.
               </li>
               <li>
-                <strong className="text-foreground">Technical Identifiers:</strong> Session UUID, temporary authorization codes, and cryptographically signed session JSON Web Tokens (JWT).
+                <strong className="text-foreground">Technical Identifiers:</strong> Session UUID and cryptographically signed JSON Web Tokens (JWT).
               </li>
             </ul>
             <p className="text-xs sm:text-sm text-muted-foreground">

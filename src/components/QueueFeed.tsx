@@ -84,9 +84,6 @@ export function QueueFeed({
             <p className="text-xs font-semibold text-slate-300">
               ไม่มีข้อความในคิว
             </p>
-            <p className="text-[11px] text-slate-500 mt-1 max-w-xs">
-              ข้อความแชทสดและของขวัญที่รออ่านเสียงจะปรากฏที่นี่โดยอัตโนมัติ
-            </p>
           </div>
         ) : (
           queue.map((item, index) => {

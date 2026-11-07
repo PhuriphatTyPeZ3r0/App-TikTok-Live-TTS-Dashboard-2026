@@ -22,13 +22,8 @@ export function TabChatSettings({ settings, onUpdate }: TabChatSettingsProps) {
     <div className="flex flex-col gap-4">
       {/* 1. เปิดใช้งาน Chat TTS */}
       <div className="flex items-center justify-between gap-4 p-3.5 bg-[#181b24] border border-[#1e222d] rounded-lg">
-        <div>
-          <div className="text-sm font-semibold text-slate-100">
-            เปิดใช้งาน Chat TTS
-          </div>
-          <div className="text-xs text-slate-400 mt-0.5">
-            แปลงข้อความคอมเมนต์ในไลฟ์ให้เป็นเสียงพูดอัตโนมัติ
-          </div>
+        <div className="text-sm font-semibold text-slate-100">
+          เปิดใช้งาน Chat TTS
         </div>
         <ToggleSwitch
           ariaLabel="เปิดใช้งาน Chat TTS"
@@ -39,13 +34,8 @@ export function TabChatSettings({ settings, onUpdate }: TabChatSettingsProps) {
 
       {/* 2. อ่านชื่อผู้ส่งข้อความ (Read Username) */}
       <div className="flex items-center justify-between gap-4 p-3.5 bg-[#181b24] border border-[#1e222d] rounded-lg">
-        <div>
-          <div className="text-sm font-semibold text-slate-100">
-            อ่านชื่อผู้ส่งข้อความ (Read Username)
-          </div>
-          <div className="text-xs text-slate-400 mt-0.5">
-            เติมคำนำหน้า เช่น <span className="text-[#25f4ee] font-mono">{"{user}"} บอกว่า: [ข้อความ]</span>
-          </div>
+        <div className="text-sm font-semibold text-slate-100">
+          อ่านชื่อผู้ส่งข้อความ (Read Username)
         </div>
         <ToggleSwitch
           ariaLabel="อ่านชื่อผู้ส่งข้อความ (Read Username)"
@@ -56,13 +46,8 @@ export function TabChatSettings({ settings, onUpdate }: TabChatSettingsProps) {
 
       {/* 3. กรองตัวอักษรลากยาวและตัดลิงก์ (Anti-Spam) */}
       <div className="flex items-center justify-between gap-4 p-3.5 bg-[#181b24] border border-[#1e222d] rounded-lg">
-        <div>
-          <div className="text-sm font-semibold text-slate-100">
-            กรองตัวอักษรลากยาวและตัดลิงก์ (Anti-Spam)
-          </div>
-          <div className="text-xs text-slate-400 mt-0.5">
-            ตัดตัวอักษรซ้ำ เช่น &quot;สวัสดีค้าบบบบบ&quot; และลบ Uniform Resource Locator (URL) เว็บไซต์
-          </div>
+        <div className="text-sm font-semibold text-slate-100">
+          กรองตัวอักษรลากยาวและตัดลิงก์ (Anti-Spam)
         </div>
         <ToggleSwitch
           ariaLabel="กรองตัวอักษรลากยาวและตัดลิงก์ (Anti-Spam)"
@@ -96,9 +81,6 @@ export function TabChatSettings({ settings, onUpdate }: TabChatSettingsProps) {
           }
           className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#fe2c55]"
         />
-        <div className="text-xs text-slate-400">
-          ข้อความที่ยาวเกินกว่านี้จะถูกตัดทอนเพื่อป้องกันการยึดคิวเสียง First-In, First-Out (FIFO)
-        </div>
       </div>
 
       {/* 5. คูลดาวน์รายคน (User Cooldown) */}
@@ -124,7 +106,7 @@ export function TabChatSettings({ settings, onUpdate }: TabChatSettingsProps) {
             className="w-24 bg-[#12141a] border border-[#1e222d] text-slate-100 font-mono rounded-lg px-3 py-2 text-sm focus:border-[#fe2c55] focus:outline-none transition-colors"
           />
           <span className="text-xs text-slate-400">
-            วินาทีต่อคน (ป้องกัน 1 ผู้ชมส่งรัวติดกัน)
+            วินาทีต่อคน
           </span>
         </div>
       </div>

@@ -191,9 +191,6 @@ export function VoiceSelector({
             <h3 className="text-sm font-bold text-white tracking-tight">
               เลือกโปรไฟล์เสียงพากย์ (Multi-Voice Ecosystem)
             </h3>
-            <p className="text-xs text-slate-400">
-              สลับโทนเสียง AI ทันทีพร้อมระบบตัดคำภาษาไทย PyThaiNLP อัตโนมัติ
-            </p>
           </div>
         </div>
         <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-[#25f4ee]/10 text-[#25f4ee] border border-[#25f4ee]/30 whitespace-nowrap">
@@ -268,11 +265,6 @@ export function VoiceSelector({
                 </div>
               </div>
 
-              {/* Description */}
-              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                {voice.description}
-              </p>
-
               {/* Bottom Action Row: Audition Button */}
               <div className="flex items-center justify-between pt-1 border-t border-white/[0.06]">
                 <span className="text-[11px] font-mono text-slate-400">
@@ -318,9 +310,6 @@ export function VoiceSelector({
               <h4 className="text-xs font-bold text-white">
                 ปรับแต่งโทนเสียงเฉพาะโปรไฟล์: {activeVoice?.name || activeId}
               </h4>
-              <p className="text-[11px] text-slate-400">
-                แยกค่าความเร็ว โทนสูง-ต่ำ และความดังอิสระสำหรับแต่ละโปรไฟล์เสียง
-              </p>
             </div>
           </div>
           <button

@@ -83,9 +83,6 @@ export function OBSIntegrationCard({
             <h2 className="text-sm font-semibold tracking-wide text-neutral-900 dark:text-white">
               ตั้งค่า OBS Studio (Browser Source)
             </h2>
-            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-              นำลิงก์ไปใส่ในโปรแกรมสตรีมเพื่อส่งเสียงและป๊อปอัปแจ้งเตือน
-            </p>
           </div>
         </div>
 
@@ -166,16 +163,6 @@ export function OBSIntegrationCard({
             <span className="text-neutral-900 dark:text-white font-bold">240 px</span>
           </div>
         </div>
-        <p className="text-[11px] text-amber-700 dark:text-amber-300/90 pt-0.5 flex items-center gap-1 flex-wrap">
-          <span className="material-symbols-rounded text-sm leading-none select-none">
-            lightbulb
-          </span>
-          <span>สำคัญ: อย่าลืมติ๊กถูกที่ช่อง</span>{" "}
-          <strong className="text-neutral-900 dark:text-white font-semibold">
-            &ldquo;Control audio via OBS&rdquo;
-          </strong>{" "}
-          <span>เพื่อให้เสียงเข้าไลฟ์</span>
-        </p>
       </div>
     </div>
   );

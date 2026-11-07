@@ -101,9 +101,6 @@ export function TabSafetySettings({
           placeholder="พิมพ์คำที่ห้ามอ่าน โดยคั่นด้วยเครื่องหมายจุลภาค (,) เช่น คำด่า, คำหยาบ, การเมือง..."
           className="w-full bg-[#12141a] border border-[#1e222d] text-slate-100 rounded-lg p-3 text-sm focus:border-[#fe2c55] focus:outline-none transition-colors resize-none leading-relaxed"
         />
-        <div className="text-xs text-slate-400">
-          ข้อความที่มีคำเหล่านี้จะถูกข้ามและไม่นำเข้าคิวเสียง First-In, First-Out (FIFO)
-        </div>
       </div>
 
       {/* 2. รายชื่อผู้ใช้งานที่ถูกบล็อก (Blacklist Users) */}
@@ -123,9 +120,6 @@ export function TabSafetySettings({
           placeholder="ระบุ @username ที่ต้องการตัดสิทธิ์การอ่าน TTS คั่นด้วยจุลภาค"
           className="w-full bg-[#12141a] border border-[#1e222d] text-slate-100 rounded-lg p-3 text-sm focus:border-[#fe2c55] focus:outline-none transition-colors resize-none leading-relaxed"
         />
-        <div className="text-xs text-slate-400">
-          ระบุ @username ที่ต้องการตัดสิทธิ์การอ่าน Text-to-Speech (TTS) คั่นด้วยจุลภาค
-        </div>
       </div>
     </div>
   );

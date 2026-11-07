@@ -11,6 +11,5 @@
 
 export * from "./AuthModal";
 export * from "./GoogleLoginButton";
-export * from "./TikTokLoginButton";
 export * from "./RoleGate";
 export * from "./UserProfileButton";

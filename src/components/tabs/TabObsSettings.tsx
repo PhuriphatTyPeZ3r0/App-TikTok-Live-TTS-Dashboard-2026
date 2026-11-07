@@ -88,23 +88,12 @@ export function TabObsSettings({
             )}
           </button>
         </div>
-        <div className="text-xs text-slate-400">
-          นำ URL นี้ไปใส่ใน Browser Source ของ OBS Studio หรือ TikTok LIVE Studio พร้อมติ๊กเลือก &quot;Control audio via OBS&quot;
-        </div>
       </div>
 
       {/* 2. เล่นเสียงในแดชบอร์ดโดยตรง (In-Dashboard Audio) */}
       <div className="flex items-center justify-between gap-4 p-3.5 bg-[#181b24] border border-[#1e222d] rounded-lg">
-        <div>
-          <div className="text-sm font-semibold text-slate-100">
-            เล่นเสียงในแดชบอร์ดโดยตรง (In-Dashboard Audio)
-          </div>
-          <div className="text-xs text-slate-400 mt-0.5">
-            เปิดให้เสียงดังในหูฟังของสตรีมเมอร์ผ่านเว็บเบราว์เซอร์นี้ทันที{" "}
-            <span className="text-amber-400/90">
-              (ปิดหากเปิดเสียงผ่าน OBS Desktop Audio เพื่อป้องกันเสียงสะท้อน)
-            </span>
-          </div>
+        <div className="text-sm font-semibold text-slate-100">
+          เล่นเสียงในแดชบอร์ดโดยตรง (In-Dashboard Audio)
         </div>
         <ToggleSwitch
           ariaLabel="เล่นเสียงในแดชบอร์ดโดยตรง (In-Dashboard Audio)"
@@ -138,9 +127,6 @@ export function TabObsSettings({
           }
           className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#fe2c55]"
         />
-        <div className="text-xs text-slate-400">
-          ควบคุมระดับเสียงสังเคราะห์ Text-to-Speech (TTS) ในแดชบอร์ดและ Overlay
-        </div>
       </div>
     </div>
   );

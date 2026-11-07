@@ -218,12 +218,9 @@ export function AuthModal({
 
         {/* Local Offline Supabase Notification */}
         {!isConfigured && (
-          <div className="p-3 rounded-md bg-muted/60 border border-border text-xs text-muted-foreground flex items-start gap-2.5">
-            <AlertCircle className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold text-foreground block">Local Offline Mode Active</span>
-              Supabase cloud credentials are unconfigured. The dashboard functions in autonomous offline broadcaster mode.
-            </div>
+          <div className="p-2.5 rounded-md bg-muted/60 border border-border text-xs text-muted-foreground flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-primary shrink-0" />
+            <span className="font-semibold text-foreground">Local Broadcaster Mode</span>
           </div>
         )}
 
@@ -319,7 +316,7 @@ export function AuthModal({
         </div>
 
         {/* Local Development / Mock Administrator Mode */}
-        <div className="p-3 rounded-md bg-muted/40 border border-border/70 flex flex-col gap-2">
+        <div className="p-3 rounded-md bg-muted/40 border border-border/70 flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
               <ShieldCheck className="w-4 h-4 text-primary" />
@@ -327,9 +324,6 @@ export function AuthModal({
             </div>
             <Badge variant="admin">Admin Bypass</Badge>
           </div>
-          <p className="text-[11px] text-muted-foreground leading-relaxed">
-            Simulate Superadministrator privilege (phuriphathem@gmail.com) for instantaneous Role-Based Access Control (RBAC) diagnostics without Google credentials.
-          </p>
           <Button
             type="button"
             variant="secondary"
@@ -425,7 +419,7 @@ export function AuthModal({
             type="submit"
             variant="default"
             size="default"
-            disabled={submitting || oauthLoading !== null}
+            disabled={submitting || isGoogleLoading}
             className="w-full h-11 min-h-[44px] font-semibold text-xs sm:text-sm shadow-sm mt-1"
           >
             {submitting ? (

@@ -201,9 +201,6 @@ export function Navbar({
               v2.1 PRO
             </Badge>
           </div>
-          <p className="text-[11px] text-muted-foreground font-normal hidden lg:block">
-            TikTok Live TTS Stream Console • PyThaiNLP &amp; Multi-Voice Studio
-          </p>
         </div>
       </div>
 
