@@ -79,6 +79,17 @@ export function useSupabaseSync({
   const hydratedUserIdRef = useRef<string | null>(null);
   const isHydratingRef = useRef<boolean>(false);
   const serializedBaselineRef = useRef<string>(JSON.stringify(settings));
+  const isMountedRef = useRef<boolean>(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const isCloudSyncActive = Boolean(isConfigured && user);
 
@@ -126,7 +137,7 @@ export function useSupabaseSync({
             userId: user.id,
             errorMessage: error.message,
           });
-          setSyncError(error.message);
+          if (isMountedRef.current) setSyncError(error.message);
         } else if (!data || data.length === 0) {
           // Fallback: If no existing profile was updated, perform an initial insert
           const insertPayload = {
@@ -146,18 +157,22 @@ export function useSupabaseSync({
               userId: user.id,
               errorMessage: insertError.message,
             });
-            setSyncError(insertError.message);
+            if (isMountedRef.current) setSyncError(insertError.message);
           } else {
-            setLastSyncedAt(new Date());
-            setSyncError(null);
+            if (isMountedRef.current) {
+              setLastSyncedAt(new Date());
+              setSyncError(null);
+            }
             logger.info('AUTH', 'Initial user profile settings created in Supabase cloud database', {
               userId: user.id,
               role,
             });
           }
         } else {
-          setLastSyncedAt(new Date());
-          setSyncError(null);
+          if (isMountedRef.current) {
+            setLastSyncedAt(new Date());
+            setSyncError(null);
+          }
           logger.info('AUTH', 'User settings synchronized to Supabase cloud profile successfully', {
             userId: user.id,
             selectedVoiceId: targetSettings.selectedVoiceId,
@@ -169,9 +184,9 @@ export function useSupabaseSync({
           userId: user.id,
           error: errorMsg,
         });
-        setSyncError(errorMsg);
+        if (isMountedRef.current) setSyncError(errorMsg);
       } finally {
-        setIsSyncing(false);
+        if (isMountedRef.current) setIsSyncing(false);
       }
     },
     [user, isConfigured, role]
@@ -208,13 +223,26 @@ export function useSupabaseSync({
         onHydrateRef.current(cloudSettings);
 
         // Update baseline to match hydrated state and prevent immediate reflective push
-        const mergedSettings = { ...settingsRef.current, ...cloudSettings };
+        const mergedSettings: TikFinitySettings = {
+          ...settingsRef.current,
+          ...cloudSettings,
+          ...(cloudSettings.voiceTunings
+            ? {
+                voiceTunings: {
+                  ...(settingsRef.current.voiceTunings || {}),
+                  ...cloudSettings.voiceTunings,
+                },
+              }
+            : {}),
+        };
         serializedBaselineRef.current = JSON.stringify(mergedSettings);
 
-        if (profile.updated_at) {
-          setLastSyncedAt(new Date(profile.updated_at));
-        } else {
-          setLastSyncedAt(new Date());
+        if (isMountedRef.current) {
+          if (profile.updated_at) {
+            setLastSyncedAt(new Date(profile.updated_at));
+          } else {
+            setLastSyncedAt(new Date());
+          }
         }
 
         logger.info('AUTH', 'Cloud settings successfully hydrated into local state', {
@@ -245,21 +273,24 @@ export function useSupabaseSync({
       return;
     }
 
-    // If change was caused by hydration, update baseline and do not trigger cloud push
+    // If change was caused by hydration, wait until hydrated settings take effect
     if (isHydratingRef.current) {
-      isHydratingRef.current = false;
-      serializedBaselineRef.current = currentSerialized;
+      if (currentSerialized === serializedBaselineRef.current) {
+        isHydratingRef.current = false;
+      }
       return;
     }
 
     serializedBaselineRef.current = currentSerialized;
-    setIsSyncing(true);
 
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
 
     debounceTimerRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        setIsSyncing(true);
+      }
       void persistSettingsToCloud(settings);
     }, debounceMs);
 
