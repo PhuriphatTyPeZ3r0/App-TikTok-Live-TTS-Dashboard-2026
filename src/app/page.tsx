@@ -1,1078 +1,150 @@
 "use client";
 
 /**
- * StreamVox Live & TikFinity-Style Streamer Cockpit & TTS Console for Next.js 15.
+ * ============================================================================
+ * StreamVox Live — Streamer Cockpit Page (Next.js 15 App Router)
+ * ============================================================================
  *
- * Professional Single-Page Application (SPA) dashboard communicating with FastAPI
- * Asynchronous Server Gateway Interface (ASGI) backend server over WebSockets (WS).
+ * Professional Single-Page Application (SPA) streamer cockpit communicating with
+ * FastAPI Asynchronous Server Gateway Interface (ASGI) backend server.
  *
- * Rebuilt to StreamVox Live 2-Column Console Layout:
- * - Top Navigation Bar (StreamVox Live Style) with Master TTS switch and Quick Voice Test
- * - Left Panel (1.15fr): TikFinitySettings tabbed configuration panel with Multi-Voice Selector
- *     (Chat TTS, Voice Profiles, Gift Alerts & TTS, Safety & Moderation Filters, OBS Studio Integration)
- * - Right Panel (0.85fr): LiveQueueConsole
- *     (NowSpeakingCard spotlight player with 8-bar audio waveform, QueueFeed priority FIFO queue)
+ * Layout Specification:
+ * - Flowbite AppShell layout wrapper
+ * - Top Metric Cards: Queue Count, TTS Master Status, TikTok Live Room, Selected Voice Model
+ * - 2-Column Cockpit Layout:
+ *     - Left Column (1.15fr): Quick stream controls & TikFinitySettings configuration panel
+ *     - Right Column (0.85fr): LiveQueueConsole (NowSpeakingCard + QueueFeed)
  *
- * Voice Actor Attribution: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
- * Master Thai Voice Model for Text-to-Speech (TTS) live streaming systems.
+ * Full Academic Terminology & Acronyms:
+ * - User Interface (UI)
+ * - User Experience (UX)
+ * - Design System (DS)
+ * - Web Content Accessibility Guidelines (WCAG)
+ * - Single-Page Application (SPA)
+ * - Asynchronous Server Gateway Interface (ASGI)
+ * - First-In, First-Out (FIFO)
+ * - Open Broadcaster Software (OBS)
+ * - Text-to-Speech (TTS)
+ * - Role-Based Access Control (RBAC)
+ * - Application Programming Interface (API)
+ *
+ * Master Thai Voice Actor Attribution:
+ * Dedicated to Master Voice Actor คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert).
+ * Official voice model for StreamVox Live Text-to-Speech (TTS) live streaming systems.
+ * ============================================================================
  */
 
-import React, { Suspense, useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Navbar } from "../components/Navbar";
-import { Sidebar } from "../components/Sidebar";
-import { TikFinitySettings, type SettingsTabId } from "../components/TikFinitySettings";
+import React from "react";
+import { AppShell } from "../components/AppShell";
+import { TikFinitySettings } from "../components/TikFinitySettings";
 import { LiveQueueConsole } from "../components/LiveQueueConsole";
-import { useTikFinitySettings } from "../hooks/useTikFinitySettings";
-import { useSupabaseSync } from "../hooks/useSupabaseSync";
-import { useDashboardSocket } from "../hooks/useDashboardSocket";
-import { normalizeTtsText, isUserOnCooldown } from "../lib/textUtils";
+import { useDashboard } from "../context/DashboardContext";
 import {
-  DEFAULT_VOICE_TUNING,
-  type QueueItem,
-  type VoiceTuningConfig,
-} from "../types/tikfinity";
-import type { DashboardEvent } from "../types/dashboard";
-import { Loader2, X } from "lucide-react";
-
-const STREAMVOX_VOICE_STORAGE_KEY = "streamvox_voice_id";
-
-function TikFinityDashboardContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-
-  const defaultBackend =
-    process.env.NEXT_PUBLIC_BACKEND_URL || "https://tiktok-live-tts-bot.onrender.com";
-  const [backendUrl, setBackendUrl] = useState<string>(
-    searchParams.get("backendUrl") || searchParams.get("backend_url") || defaultBackend
-  );
-
-  const [sessionId, setSessionId] = useState<string>(
-    searchParams.get("sessionId") || searchParams.get("session_id") || ""
-  );
-  const [adminToken, setAdminToken] = useState<string>(
-    searchParams.get("token") || searchParams.get("adminToken") || ""
-  );
-  const [overlayToken, setOverlayToken] = useState<string>(
-    searchParams.get("overlayToken") || searchParams.get("overlay_token") || ""
-  );
-  const [username, setUsername] = useState<string>(
-    searchParams.get("username") || "phuriphat_live"
-  );
-
-  // Modal / Onboarding input state
-  const [showRoomModal, setShowRoomModal] = useState<boolean>(false);
-  const [inputUsername, setInputUsername] = useState<string>("");
-  const [isStartingSession, setIsStartingSession] = useState<boolean>(false);
-  const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
-
-  // Responsive Hybrid Sidebar & Active Navigation state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
-  const [sidebarMobileOpen, setSidebarMobileOpen] = useState<boolean>(false);
-  const [activeNavTab, setActiveNavTab] = useState<string>("cockpit");
-  const [settingsSubtab, setSettingsSubtab] = useState<SettingsTabId>("chat");
-
-  // Escape key handler for Room Switcher modal
-  useEffect(() => {
-    if (!showRoomModal) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setShowRoomModal(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showRoomModal]);
-
-  const handleSelectNavTab = (tabId: string) => {
-    setActiveNavTab(tabId);
-    if (tabId === "voice") {
-      setSettingsSubtab("voices");
-    } else if (tabId === "settings") {
-      setSettingsSubtab("chat");
-    } else if (tabId === "gift") {
-      setSettingsSubtab("gift");
-    } else if (tabId === "safety") {
-      setSettingsSubtab("safety");
-    } else if (tabId === "obs") {
-      setSettingsSubtab("obs");
-    } else if (tabId === "logs") {
-      setSettingsSubtab("logs");
-    }
-    if (typeof window !== "undefined") {
-      if (tabId === "queue") {
-        const el = document.getElementById("live-queue-section");
-        if (el) el.scrollIntoView({ behavior: "smooth" });
-      } else {
-        const el = document.getElementById("settings-section");
-        if (el) el.scrollIntoView({ behavior: "smooth" });
-      }
-    }
-  };
-
-  // TikFinity Settings Hook
-  const { settings, updateSettings, isLoaded: settingsLoaded } = useTikFinitySettings();
-
-  // Cloud Settings Synchronization Hook (Supabase PostgreSQL public.user_profiles)
-  const {
-    isSyncing,
-    lastSyncedAt,
-    syncError,
-    isCloudSyncActive,
-    manualSync,
-  } = useSupabaseSync({
-    settings,
-    onHydrate: updateSettings,
-    debounceMs: 1000,
-  });
-
-  // Active selectedVoiceId state synchronized with settings & localStorage
-  const selectedVoiceId = settings.selectedVoiceId || "yuta";
-
-  // Hydrate streamvox_voice_id from localStorage on mount if present
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const savedVoice = window.localStorage.getItem(STREAMVOX_VOICE_STORAGE_KEY);
-      if (savedVoice && savedVoice !== settings.selectedVoiceId) {
-        updateSettings({ selectedVoiceId: savedVoice });
-      }
-    } catch {}
-  }, [settingsLoaded]);
-
-  // Playback & Priority Queue state
-  const [queue, setQueue] = useState<QueueItem[]>([]);
-  const [currentSpeaker, setCurrentSpeaker] = useState<QueueItem | null>(null);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [isPaused, setIsPaused] = useState<boolean>(false);
-  const [isTestingVoice, setIsTestingVoice] = useState<boolean>(false);
-  const [testingVoiceId, setTestingVoiceId] = useState<string | null>(null);
-
-  // In-memory spam throttling and user cooldown map
-  const userCooldownMap = useRef(new Map<string, number>());
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Playback execution generation ID and inflight fetch abort controller
-  const currentPlayIdRef = useRef<number>(0);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Suppress harmless third-party browser extension message-channel unhandled rejections
-  useEffect(() => {
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      const msg = event?.reason?.message || String(event?.reason || "");
-      if (
-        msg.includes("message channel closed before a response was received") ||
-        msg.includes("A listener indicated an asynchronous response")
-      ) {
-        event.preventDefault();
-      }
-    };
-
-    window.addEventListener("unhandledrejection", handleUnhandledRejection);
-    return () => {
-      window.removeEventListener("unhandledrejection", handleUnhandledRejection);
-    };
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      currentPlayIdRef.current += 1;
-      abortControllerRef.current?.abort();
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-  // Sync refs to avoid stale closures in event listeners
-  const settingsRef = useRef(settings);
-  useEffect(() => {
-    settingsRef.current = settings;
-  }, [settings]);
-
-  // Periodic cleanup of userCooldownMap
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const threshold = (settings.userCooldownSeconds || 15) * 1000;
-      userCooldownMap.current.forEach((timestamp, user) => {
-        if (now - timestamp > threshold) {
-          userCooldownMap.current.delete(user);
-        }
-      });
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [settings.userCooldownSeconds]);
-
-  // Auto-discover active session from backend or browser sessionStorage if none in URL
-  const refreshActiveSession = useCallback(async (force = false) => {
-    try {
-      const cleanUrl = backendUrl.replace(/\/+$/, "");
-      const res = await fetch(`${cleanUrl}/api/sessions/active`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.has_active_session && data.session_id) {
-          if (force || !sessionId || sessionId !== data.session_id || !adminToken || adminToken !== data.admin_token) {
-            console.info(`[StreamVox Dashboard] Synchronizing with active backend session: ${data.session_id}`);
-            setSessionId(data.session_id);
-            setAdminToken(data.admin_token);
-            setOverlayToken(data.overlay_token || "");
-            if (data.tiktok_username) setUsername(data.tiktok_username);
-
-            try {
-              sessionStorage.setItem(
-                "tiktok_live_tts_session",
-                JSON.stringify({
-                  sessionId: data.session_id,
-                  adminToken: data.admin_token,
-                  overlayToken: data.overlay_token || "",
-                  username: data.tiktok_username || "phuriphat_live",
-                })
-              );
-            } catch (e) {}
-
-            if (typeof window !== "undefined") {
-              const url = new URL(window.location.href);
-              url.searchParams.set("sessionId", data.session_id);
-              url.searchParams.set("token", data.admin_token);
-              if (data.overlay_token) url.searchParams.set("overlayToken", data.overlay_token);
-              if (data.tiktok_username) url.searchParams.set("username", data.tiktok_username);
-              window.history.replaceState({}, "", url.toString());
-            }
-          }
-          return data;
-        }
-      }
-    } catch (err) {
-      console.warn("[StreamVox Dashboard] Failed auto-discovering active session:", err);
-    }
-    return null;
-  }, [backendUrl, sessionId, adminToken]);
-
-  const handleUnauthorized = useCallback(() => {
-    console.warn("[StreamVox Dashboard] Unauthorized or session expired. Clearing stale cache and re-syncing...");
-    try {
-      sessionStorage.removeItem("tiktok_live_tts_session");
-    } catch (e) {}
-    refreshActiveSession(true);
-  }, [refreshActiveSession]);
-
-  // Synchronize and validate active session on mount
-  useEffect(() => {
-    // 1. Try sessionStorage first as instant cache
-    let cachedSessionId = sessionId;
-    let cachedToken = adminToken;
-    if (!cachedSessionId || !cachedToken) {
-      try {
-        const saved = sessionStorage.getItem("tiktok_live_tts_session");
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.sessionId && parsed.adminToken) {
-            cachedSessionId = parsed.sessionId;
-            cachedToken = parsed.adminToken;
-            setSessionId(parsed.sessionId);
-            setAdminToken(parsed.adminToken);
-            setOverlayToken(parsed.overlayToken || "");
-            if (parsed.username) setUsername(parsed.username);
-          }
-        }
-      } catch (e) {}
-    }
-
-    // 2. Validate against /api/sessions/active to ensure backend session has not recycled
-    async function validateActiveSession() {
-      try {
-        const cleanUrl = backendUrl.replace(/\/+$/, "");
-        const res = await fetch(`${cleanUrl}/api/sessions/active`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.has_active_session && data.session_id) {
-            if (!cachedSessionId || cachedSessionId !== data.session_id || cachedToken !== data.admin_token) {
-              console.info(`[StreamVox Dashboard] Synchronizing with active backend session: ${data.session_id}`);
-              setSessionId(data.session_id);
-              setAdminToken(data.admin_token);
-              setOverlayToken(data.overlay_token || "");
-              if (data.tiktok_username) setUsername(data.tiktok_username);
-
-              try {
-                sessionStorage.setItem(
-                  "tiktok_live_tts_session",
-                  JSON.stringify({
-                    sessionId: data.session_id,
-                    adminToken: data.admin_token,
-                    overlayToken: data.overlay_token || "",
-                    username: data.tiktok_username || "phuriphat_live",
-                  })
-                );
-              } catch (e) {}
-
-              if (typeof window !== "undefined") {
-                const url = new URL(window.location.href);
-                url.searchParams.set("sessionId", data.session_id);
-                url.searchParams.set("token", data.admin_token);
-                if (data.overlay_token) url.searchParams.set("overlayToken", data.overlay_token);
-                if (data.tiktok_username) url.searchParams.set("username", data.tiktok_username);
-                window.history.replaceState({}, "", url.toString());
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("[StreamVox Dashboard] Active session probe error:", err);
-      }
-    }
-
-    validateActiveSession();
-  }, [backendUrl]);
-
-  // Inbound WebSocket Event Handler with Anti-Spam Normalization & Priority Queue
-  const handleSocketEvent = useCallback((event: DashboardEvent) => {
-    const currentSettings = settingsRef.current;
-
-    const eventType = (event.type || "").toUpperCase();
-
-    // Synchronize voice selection if updated remotely
-    if (eventType === "VOICE_CHANGED") {
-      const remoteVoiceId = event.data?.voice_id || (event as any).voice_id;
-      if (remoteVoiceId && remoteVoiceId !== currentSettings.selectedVoiceId) {
-        updateSettings({ selectedVoiceId: remoteVoiceId });
-        try {
-          window.localStorage.setItem(STREAMVOX_VOICE_STORAGE_KEY, remoteVoiceId);
-        } catch {}
-      }
-      return;
-    }
-
-    if (!currentSettings.masterTtsEnabled) return;
-
-    // 1. Chat Comment Event (EVENT_MESSAGE or EVENT_CHAT)
-    if (eventType === "EVENT_MESSAGE" || eventType === "EVENT_CHAT") {
-      if (!currentSettings.chatTtsEnabled) return;
-
-      const raw = event.data || event;
-      const user = (raw.user || raw.username || "Viewer").trim();
-      const rawText = raw.text || raw.comment || "";
-
-      // Blacklist filter
-      const lowerUser = user.toLowerCase();
-      const isBlacklisted = (currentSettings.blacklistedUsers || []).some(
-        (b) => b.trim().toLowerCase() === lowerUser
-      );
-      if (isBlacklisted) return;
-
-      // Anti-spam viewer cooldown check
-      if (
-        currentSettings.antiSpamEnabled &&
-        isUserOnCooldown(
-          user,
-          currentSettings.userCooldownSeconds,
-          userCooldownMap.current
-        )
-      ) {
-        return;
-      }
-
-      // Normalization & Moderation filter
-      const norm = normalizeTtsText(rawText, {
-        maxCharacters: currentSettings.maxCharacters,
-        bannedWords: currentSettings.bannedWords,
-        readUsername: currentSettings.readUsername,
-        username: user,
-      });
-
-      if (norm.isBlocked || !norm.text.trim()) {
-        return;
-      }
-
-      const newItem: QueueItem = {
-        id: raw.id || `chat-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        username: user,
-        text: norm.text,
-        isGift: false,
-        timestamp: raw.timestamp || Date.now(),
-        voiceId: currentSettings.selectedVoiceId || "yuta",
-      };
-
-      setQueue((prev) => [...prev, newItem]);
-      return;
-    }
-
-    // 2. Virtual Gift Superchat Event (EVENT_GIFT)
-    if (eventType === "EVENT_GIFT") {
-      if (!currentSettings.giftTtsEnabled) return;
-
-      const raw = event.data || event;
-      const user = (raw.user || raw.username || "Supporter").trim();
-      const giftName = raw.gift_name || raw.giftName || "ของขวัญ";
-      const giftAmount = Number(raw.gift_count || raw.giftAmount || 1);
-      const coins = Number(raw.diamonds || raw.coins || raw.diamond_count || giftAmount);
-
-      if (coins < (currentSettings.giftMinCoins || 1)) {
-        return;
-      }
-
-      // Format text using settings.giftTemplate substituting placeholders
-      const template =
-        currentSettings.giftTemplate ||
-        "ขอบคุณคุณ {user} ที่ส่ง {amount}x {gift} ให้ยูตะนะครับ!";
-      const formattedText = template
-        .replace(/{user}/g, user)
-        .replace(/{gift}/g, giftName)
-        .replace(/{amount}/g, String(giftAmount))
-        .replace(/{coins}/g, String(coins));
-
-      const newGiftItem: QueueItem = {
-        id: raw.id || `gift-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        username: user,
-        text: formattedText,
-        isGift: true,
-        giftName,
-        giftAmount,
-        coins,
-        timestamp: raw.timestamp || Date.now(),
-        voiceId: currentSettings.selectedVoiceId || "yuta",
-      };
-
-      if (currentSettings.giftPriorityQueue) {
-        // Prepend gift ahead of chat while maintaining FIFO order among multiple gifts
-        setQueue((prev) => {
-          const firstChatIdx = prev.findIndex((item) => !item.isGift);
-          if (firstChatIdx === -1) {
-            return [...prev, newGiftItem];
-          }
-          return [
-            ...prev.slice(0, firstChatIdx),
-            newGiftItem,
-            ...prev.slice(firstChatIdx),
-          ];
-        });
-      } else {
-        setQueue((prev) => [...prev, newGiftItem]);
-      }
-      return;
-    }
-
-    // 3. Emergency Queue Flush (CONTROL_FLUSH)
-    if (eventType === "CONTROL_FLUSH") {
-      currentPlayIdRef.current += 1;
-      abortControllerRef.current?.abort();
-      setQueue([]);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-      setIsPlaying(false);
-      setCurrentSpeaker(null);
-    }
-  }, [updateSettings]);
-
-  // Real-time WebSocket hook with live controls
-  const {
-    isConnected,
-    isReconnecting,
-    stats,
-    error: socketError,
-    testVoice,
-    skipAudio,
-    pauseAudio,
-    resumeAudio,
-    clearQueue: wsClearQueue,
-  } = useDashboardSocket({
-    sessionId,
-    adminToken,
-    backendUrl,
-    enabled: Boolean(sessionId && adminToken),
-    onEvent: handleSocketEvent,
-    onUnauthorized: handleUnauthorized,
-  });
-
-  // Synchronize selectedVoiceId and per-voice tuning with Backend REST API (/voice) and WebSocket (set_voice)
-  const syncVoiceWithBackend = useCallback(
-    async (voiceId: string, customTuning?: VoiceTuningConfig) => {
-      const activeTuning =
-        customTuning ||
-        settingsRef.current.voiceTunings?.[voiceId] ||
-        DEFAULT_VOICE_TUNING;
-
-      updateSettings({
-        selectedVoiceId: voiceId,
-        voiceTunings: {
-          ...(settingsRef.current.voiceTunings || {}),
-          [voiceId]: activeTuning,
-        },
-      });
-      if (typeof window !== "undefined") {
-        try {
-          window.localStorage.setItem(STREAMVOX_VOICE_STORAGE_KEY, voiceId);
-        } catch {}
-      }
-
-      const cleanUrl = backendUrl.replace(/\/+$/, "");
-      const targetSession = sessionId || "default_session";
-      const tokenParam = adminToken || overlayToken || "admin_token";
-
-      // 1. Dispatch REST POST to /api/session/${sessionId}/voice?token=${overlayToken}
-      try {
-        await fetch(
-          `${cleanUrl}/api/session/${encodeURIComponent(targetSession)}/voice?token=${encodeURIComponent(tokenParam)}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Admin-Token": adminToken || tokenParam,
-              Authorization: adminToken ? `Bearer ${adminToken}` : "",
-            },
-            body: JSON.stringify({
-              voice_id: voiceId,
-              speed: activeTuning.speed,
-              pitch: activeTuning.pitch,
-              volume: activeTuning.volume,
-            }),
-          }
-        );
-      } catch (err) {
-        console.warn("[StreamVox Dashboard] Failed syncing voice via REST /voice:", err);
-      }
-
-      // 2. Also send WebSocket message { action: "set_voice", voice_id: voiceId, ... } if connected
-      if (typeof window !== "undefined" && isConnected && sessionId && adminToken) {
-        try {
-          const wsProtocol = cleanUrl.startsWith("https") ? "wss:" : "ws:";
-          const wsHost = cleanUrl.replace(/^https?:\/\//, "");
-          const wsEndpoint = `${wsProtocol}//${wsHost}/ws/dashboard/${encodeURIComponent(sessionId)}?token=${encodeURIComponent(adminToken)}`;
-          const tempWs = new WebSocket(wsEndpoint);
-          tempWs.onopen = () => {
-            tempWs.send(
-              JSON.stringify({
-                action: "set_voice",
-                voice_id: voiceId,
-                speed: activeTuning.speed,
-                pitch: activeTuning.pitch,
-                volume: activeTuning.volume,
-              })
-            );
-            setTimeout(() => tempWs.close(), 250);
-          };
-        } catch {}
-      }
-    },
-    [backendUrl, sessionId, adminToken, overlayToken, isConnected, updateSettings]
-  );
-
-  const handleChangeVoiceTuning = useCallback(
-    (voiceId: string, tuning: VoiceTuningConfig) => {
-      syncVoiceWithBackend(voiceId, tuning);
-    },
-    [syncVoiceWithBackend]
-  );
-
-  // Playback & Audio Routing Engine
-  useEffect(() => {
-    if (isPlaying || isPaused || queue.length === 0) {
-      return;
-    }
-
-    const nextItem = queue[0];
-    setQueue((prev) => prev.slice(1));
-    setCurrentSpeaker(nextItem);
-    setIsPlaying(true);
-
-    // Increment play ID for this specific playback turn
-    currentPlayIdRef.current += 1;
-    const thisPlayId = currentPlayIdRef.current;
-
-    // Abort any prior inflight fetch and create a new AbortController
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    async function executeSpeech() {
-      const currentSettings = settingsRef.current;
-      const isStale = () => currentPlayIdRef.current !== thisPlayId;
-      const activeVoiceId = nextItem.voiceId || currentSettings.selectedVoiceId || "yuta";
-      const activeTuning =
-        currentSettings.voiceTunings?.[activeVoiceId] || DEFAULT_VOICE_TUNING;
-
-      // Always dispatch synthesis request to backend so OBS Overlay receives audio via WebSocket broadcast
-      try {
-        const cleanUrl = backendUrl.replace(/\/+$/, "");
-        const targetUrl =
-          sessionId && sessionId !== "default_session"
-            ? `${cleanUrl}/api/session/${encodeURIComponent(sessionId)}/test-voice?token=${encodeURIComponent(adminToken || "")}`
-            : `${cleanUrl}/api/session/test-voice`;
-
-        const res = await fetch(targetUrl, {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            "Content-Type": "application/json",
-            "X-Admin-Token": adminToken || "",
-            Authorization: adminToken ? `Bearer ${adminToken}` : "",
-          },
-          body: JSON.stringify({
-            sessionId,
-            adminToken,
-            text: nextItem.text,
-            user: nextItem.username,
-            voice_id: activeVoiceId,
-            speed: activeTuning.speed,
-            pitch: activeTuning.pitch,
-            volume: activeTuning.volume,
-          }),
-        });
-
-        // Discard result if skipped or superseded while fetch was inflight
-        if (isStale()) return;
-
-        if (res.status === 403 || res.status === 404) {
-          console.warn(`[StreamVox Dashboard] Speech synthesis HTTP ${res.status}. Requesting active session re-sync.`);
-          handleUnauthorized();
-        }
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.audio_base64 && !isStale()) {
-            if (currentSettings.inDashboardAudio || nextItem.isTest) {
-              const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
-              audio.volume = Math.max(0, Math.min(1, currentSettings.volume));
-              audioRef.current = audio;
-
-              audio.onended = () => {
-                if (!isStale()) {
-                  audioRef.current = null;
-                  setIsPlaying(false);
-                  setCurrentSpeaker(null);
-                }
-              };
-
-              audio.onerror = () => {
-                if (!isStale()) {
-                  audioRef.current = null;
-                  setIsPlaying(false);
-                  setCurrentSpeaker(null);
-                }
-              };
-
-              await audio.play();
-              return;
-            } else {
-              // In-Dashboard Audio is disabled (echo prevention): OBS Overlay handles playback.
-              const simulatedMs = Math.max(2500, Math.min(10000, nextItem.text.length * 120));
-              setTimeout(() => {
-                if (!isStale()) {
-                  setIsPlaying(false);
-                  setCurrentSpeaker(null);
-                }
-              }, simulatedMs);
-              return;
-            }
-          }
-        }
-      } catch (err: any) {
-        if (err.name === "AbortError" || isStale()) {
-          return;
-        }
-        console.warn("[StreamVox Dashboard] Remote audio synthesis failed, using Web Speech fallback:", err);
-      }
-
-      if (isStale()) return;
-
-      // Fallback: Web Speech API synthesis in browser (only if inDashboardAudio is enabled)
-      if (currentSettings.inDashboardAudio && typeof window !== "undefined" && "speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance(nextItem.text);
-        utterance.lang = "th-TH";
-        utterance.volume = Math.max(0, Math.min(1, currentSettings.volume));
-
-        utterance.onend = () => {
-          if (!isStale()) {
-            setIsPlaying(false);
-            setCurrentSpeaker(null);
-          }
-        };
-
-        utterance.onerror = () => {
-          if (!isStale()) {
-            setIsPlaying(false);
-            setCurrentSpeaker(null);
-          }
-        };
-
-        window.speechSynthesis.speak(utterance);
-        return;
-      }
-
-      // Safe fallback timer (if inDashboardAudio is false or synthesis failed)
-      const fallbackMs = Math.max(2000, Math.min(8000, nextItem.text.length * 100));
-      setTimeout(() => {
-        if (!isStale()) {
-          setIsPlaying(false);
-          setCurrentSpeaker(null);
-        }
-      }, fallbackMs);
-    }
-
-    executeSpeech();
-  }, [isPlaying, isPaused, queue, backendUrl, sessionId, adminToken, handleUnauthorized]);
-
-  // Streamer Control Actions
-  const handleSkip = useCallback(() => {
-    currentPlayIdRef.current += 1;
-    abortControllerRef.current?.abort();
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    skipAudio();
-    setIsPlaying(false);
-    setCurrentSpeaker(null);
-  }, [skipAudio]);
-
-  const handleTogglePause = useCallback(() => {
-    setIsPaused((prev) => {
-      const nextPaused = !prev;
-      if (nextPaused) {
-        if (audioRef.current) audioRef.current.pause();
-        if (typeof window !== "undefined" && window.speechSynthesis) {
-          window.speechSynthesis.pause();
-        }
-        pauseAudio();
-      } else {
-        if (audioRef.current) audioRef.current.play().catch(() => {});
-        if (typeof window !== "undefined" && window.speechSynthesis) {
-          window.speechSynthesis.resume();
-        }
-        resumeAudio();
-      }
-      return nextPaused;
-    });
-  }, [pauseAudio, resumeAudio]);
-
-  const handleClearQueue = useCallback(() => {
-    currentPlayIdRef.current += 1;
-    abortControllerRef.current?.abort();
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    setQueue([]);
-    wsClearQueue();
-    setIsPlaying(false);
-    setCurrentSpeaker(null);
-  }, [wsClearQueue]);
-
-  const handleDeleteItem = useCallback((id: string) => {
-    setQueue((prev) => prev.filter((item) => item.id !== id));
-  }, []);
-
-  // Audition a specific voice from VoiceSelector or trigger Quick Voice Test
-  const handleTestSpecificVoice = useCallback(
-    (voiceId?: string, customSampleText?: string) => {
-      const targetVoice = voiceId || settingsRef.current.selectedVoiceId || "yuta";
-      const sampleText =
-        customSampleText || "ทดสอบระบบเสียงสังเคราะห์ สตรีมว็อกซ์ไลฟ์สำเร็จ";
-
-      setIsTestingVoice(true);
-      setTestingVoiceId(targetVoice);
-
-      const testItem: QueueItem = {
-        id: `test-${Date.now()}`,
-        username: `ระบบ (${targetVoice.toUpperCase()})`,
-        text: sampleText,
-        isGift: false,
-        timestamp: Date.now(),
-        isTest: true,
-        voiceId: targetVoice,
-      };
-
-      setIsPaused(false);
-      setQueue((prev) => [testItem, ...prev]);
-
-      setTimeout(() => {
-        setIsTestingVoice(false);
-        setTestingVoiceId(null);
-      }, 1000);
-    },
-    []
-  );
-
-  const handleQuickVoiceTest = useCallback(() => {
-    handleTestSpecificVoice(settingsRef.current.selectedVoiceId || "yuta");
-  }, [handleTestSpecificVoice]);
-
-  // Start or Connect to TikTok Room
-  const handleStartRoomSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanUser = inputUsername.replace(/^@/, "").trim();
-    if (!cleanUser) return;
-
-    setIsStartingSession(true);
-    setConnectionNotice(null);
-
-    try {
-      const cleanUrl = backendUrl.replace(/\/+$/, "");
-      let res = await fetch(`${cleanUrl}/api/sessions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tiktok_username: cleanUser }),
-      });
-
-      // Graceful fallback for older backend builds that only have /api/session/start
-      if (!res.ok && res.status === 404) {
-        res = await fetch(`${cleanUrl}/api/session/start`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tiktok_username: cleanUser, fish_audio_api_key: "" }),
-        });
-      }
-
-      if (!res.ok) {
-        let errDetail = `Server returned HTTP ${res.status}`;
-        try {
-          const errJson = await res.json();
-          if (errJson?.detail) errDetail = errJson.detail;
-        } catch {}
-        throw new Error(errDetail);
-      }
-
-      const data = await res.json();
-      setSessionId(data.session_id);
-      setAdminToken(data.admin_token);
-      setOverlayToken(data.overlay_token || "");
-      setUsername(cleanUser);
-
-      sessionStorage.setItem(
-        "tiktok_live_tts_session",
-        JSON.stringify({
-          sessionId: data.session_id,
-          adminToken: data.admin_token,
-          overlayToken: data.overlay_token || "",
-          username: cleanUser,
-        })
-      );
-
-      const params = new URLSearchParams(window.location.search);
-      params.set("sessionId", data.session_id);
-      params.set("token", data.admin_token);
-      params.set("overlayToken", data.overlay_token || "");
-      params.set("username", cleanUser);
-      router.replace(`/?${params.toString()}`);
-
-      setShowRoomModal(false);
-    } catch (err: any) {
-      setConnectionNotice(`ไม่สามารถเชื่อมต่อห้อง @${cleanUser} ได้: ${err.message}`);
-    } finally {
-      setIsStartingSession(false);
-    }
-  };
+  ListOrdered,
+  Radio,
+  Volume2,
+  Mic,
+} from "lucide-react";
+
+export default function CockpitPage(): React.JSX.Element {
+  const dashboard = useDashboard();
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background text-foreground font-sans selection:bg-primary/30 selection:text-foreground">
-      {/* 1. Flowbite Standard Sidebar (fixed top-0 left-0 z-40 w-64 h-full) */}
-      <Sidebar
-        activeTab={activeNavTab}
-        onTabChange={handleSelectNavTab}
-        onSelectTab={handleSelectNavTab}
-        isMobileOpen={sidebarMobileOpen}
-        onMobileClose={() => setSidebarMobileOpen(false)}
-        onCloseMobile={() => setSidebarMobileOpen(false)}
-        liveQueueCount={queue.length}
-        isStreaming={isConnected}
-      />
-
-      {/* 2. Flowbite Standard Main Layout Container (sm:ml-64) */}
-      <div className="sm:ml-64 min-h-screen min-h-[100dvh] flex flex-col">
-        {/* StreamVox Live Sticky Top Navigation Bar */}
-        <Navbar
-          username={username}
-          isConnected={isConnected}
-          isReconnecting={isReconnecting}
-          backendUrl={backendUrl}
-          sessionId={sessionId}
-          overlayToken={overlayToken}
-          masterTtsEnabled={settings.masterTtsEnabled}
-          onToggleMaster={(enabled) => updateSettings({ masterTtsEnabled: enabled })}
-          onTestVoice={handleQuickVoiceTest}
-          isTestingVoice={isTestingVoice}
-          selectedVoiceId={selectedVoiceId}
-          onOpenRoomModal={() => setShowRoomModal(true)}
-          onSwitchAccount={() => setShowRoomModal(true)}
-          onToggleSidebar={() => setSidebarMobileOpen((prev) => !prev)}
-          isSidebarOpen={sidebarMobileOpen}
-        />
-
-        {/* Main 2-Column Master Console Layout with Bento Grid & Safe Area Padding */}
-        <main className="flex-1 w-full min-w-0 overflow-x-hidden p-3 sm:p-4 md:p-6 pb-[calc(2.5rem+env(safe-area-inset-bottom,0px))]">
-          <div className="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-4 sm:gap-6 w-full">
-            {/* Left Column: StreamVox & TikFinity Tabbed Settings Panel */}
-            <div id="settings-section" className="w-full">
-              <TikFinitySettings
-                activeTab={settingsSubtab}
-                onTabChange={(tab) => {
-                  setSettingsSubtab(tab);
-                  if (tab === "voices") setActiveNavTab("voice");
-                  else if (tab === "obs") setActiveNavTab("obs");
-                  else if (tab === "logs") setActiveNavTab("logs");
-                  else setActiveNavTab("settings");
-                }}
-                settings={settings}
-                onUpdate={updateSettings}
-                onSelectVoice={syncVoiceWithBackend}
-                onChangeTuning={handleChangeVoiceTuning}
-                onTestVoice={handleTestSpecificVoice}
-                backendUrl={backendUrl}
-                testingVoiceId={testingVoiceId}
-                sessionId={sessionId}
-                overlayToken={overlayToken}
-                isSyncing={isSyncing}
-                isCloudSyncActive={isCloudSyncActive}
-                lastSyncedAt={lastSyncedAt}
-                syncError={syncError}
-                onManualSync={manualSync}
-              />
-            </div>
-
-            {/* Right Column: Live Queue & Playback Console */}
-            <div id="live-queue-section" className="w-full">
-              <LiveQueueConsole
-                currentSpeaker={currentSpeaker}
-                isPlaying={isPlaying}
-                isPaused={isPaused}
-                queue={queue}
-                onSkip={handleSkip}
-                onTogglePause={handleTogglePause}
-                onClearQueue={handleClearQueue}
-                onDeleteItem={handleDeleteItem}
-              />
+    <AppShell>
+      {/* 1. Quick Metrics Cards Row */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* Metric 1: Queue Count */}
+        <div className="bg-[#161822] border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-md">
+          <div>
+            <div className="text-xs font-semibold text-slate-400">คิวรออ่าน (FIFO)</div>
+            <div className="text-2xl font-black text-white mt-0.5">
+              {dashboard.queue.length}
+              <span className="text-xs text-slate-400 font-normal ml-1.5">ข้อความ</span>
             </div>
           </div>
-        </main>
+          <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <ListOrdered className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Metric 2: Master TTS Status */}
+        <div className="bg-[#161822] border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-md">
+          <div>
+            <div className="text-xs font-semibold text-slate-400">สถานะเสียงสังเคราะห์ (TTS)</div>
+            <div className="text-sm font-bold mt-1 flex items-center gap-1.5">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  dashboard.masterTtsEnabled ? "bg-emerald-400 animate-pulse" : "bg-rose-500"
+                }`}
+              />
+              <span className={dashboard.masterTtsEnabled ? "text-emerald-400" : "text-rose-400"}>
+                {dashboard.masterTtsEnabled ? "เปิดใช้งาน (Active)" : "ปิดชั่วคราว (Disabled)"}
+              </span>
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <Volume2 className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Metric 3: Connected TikTok Live Room */}
+        <div className="bg-[#161822] border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-md">
+          <div>
+            <div className="text-xs font-semibold text-slate-400">ห้องไลฟ์สตรีม (Room)</div>
+            <div className="text-base font-bold text-white mt-0.5 font-mono truncate max-w-[130px]">
+              @{dashboard.username}
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-[#fe2c55]/10 border border-[#fe2c55]/20 flex items-center justify-center text-[#fe2c55]">
+            <Radio className="w-5 h-5" />
+          </div>
+        </div>
+
+        {/* Metric 4: Selected Voice Model */}
+        <div className="bg-[#161822] border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-md">
+          <div>
+            <div className="text-xs font-semibold text-slate-400">โมเดลเสียงหลัก (Voice)</div>
+            <div className="text-base font-bold text-cyan-300 mt-0.5 uppercase tracking-wide">
+              {dashboard.activeVoiceId}
+            </div>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+            <Mic className="w-5 h-5" />
+          </div>
+        </div>
       </div>
 
-      {/* Room Switcher Modal Dialog (100% Centered Viewport & Top Layer z-[100] / z-[101]) */}
-      {showRoomModal && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md overflow-y-auto"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setShowRoomModal(false);
-            }
-          }}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="relative z-[101] w-full max-w-md my-auto bg-card text-card-foreground border border-border rounded-2xl p-5 sm:p-6 shadow-2xl flex flex-col gap-4 backdrop-blur-2xl modal-center-animate max-h-[calc(100dvh-2rem)] overflow-y-auto">
-            <button
-              type="button"
-              onClick={() => setShowRoomModal(false)}
-              className="absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.08] transition-colors min-touch-target flex items-center justify-center"
-              aria-label="Close dialog"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center text-black font-extrabold text-base">
-                <span className="material-symbols-rounded text-xl text-black">
-                  graphic_eq
-                </span>
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-white">
-                  สลับห้อง TikTok LIVE (StreamVox Live)
-                </h3>
-                <p className="text-xs text-slate-400">
-                  ระบุชื่อบัญชี TikTok เพื่อเชื่อมต่อและรับฟังแชท/ของขวัญ
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleStartRoomSession} className="flex flex-col gap-4 mt-2">
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  TikTok Username (@handle)
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 font-mono text-sm">
-                    @
-                  </span>
-                  <input
-                    type="text"
-                    value={inputUsername}
-                    onChange={(e) => setInputUsername(e.target.value)}
-                    placeholder="phuriphat_live"
-                    className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-[#181b24] border border-[#1e222d] focus:border-[#25f4ee] text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
-                    required
-                    autoFocus
-                  />
-                </div>
-              </div>
-
-              {connectionNotice && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs leading-relaxed">
-                  {connectionNotice}
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRoomModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  disabled={isStartingSession || !inputUsername.trim()}
-                  className="px-5 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-[#fe2c55] to-[#25f4ee] text-black hover:opacity-90 transition-opacity flex items-center gap-2 font-bold disabled:opacity-50"
-                >
-                  {isStartingSession && (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  )}
-                  <span>เชื่อมต่อไลฟ์สตรีม</span>
-                </button>
-              </div>
-            </form>
-          </div>
+      {/* 2. Streamer Cockpit 2-Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (1.15fr ~ 7 cols): Quick Controls & TikFinitySettings */}
+        <div className="lg:col-span-7 space-y-6">
+          <TikFinitySettings
+            settings={dashboard.settings}
+            onUpdate={dashboard.updateSettings}
+            onSelectVoice={dashboard.setActiveVoiceId}
+            onChangeTuning={dashboard.updateVoiceTuning}
+            onTestVoice={dashboard.testVoice}
+            backendUrl={dashboard.backendUrl}
+            testingVoiceId={dashboard.testingVoiceId}
+            sessionId={dashboard.sessionId}
+            overlayToken={dashboard.overlayToken}
+          />
         </div>
-      )}
-    </div>
-  );
-}
 
-export default function TikFinityDashboardPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#0a0b0e] flex items-center justify-center text-slate-400">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#fe2c55] to-[#25f4ee] flex items-center justify-center text-black font-extrabold text-sm animate-pulse">
-              SV
-            </div>
-            <p className="text-xs font-mono text-slate-500">
-              Loading StreamVox Live Console...
-            </p>
-          </div>
+        {/* Right Column (0.85fr ~ 5 cols): LiveQueueConsole (NowSpeakingCard + QueueFeed) */}
+        <div className="lg:col-span-5 space-y-6 sticky top-24">
+          <LiveQueueConsole
+            currentSpeaker={dashboard.currentSpeaker}
+            isPlaying={dashboard.isPlaying}
+            isPaused={dashboard.isPaused}
+            onSkip={dashboard.skipCurrent}
+            onTogglePause={dashboard.togglePause}
+            onClearQueue={dashboard.clearQueue}
+            queue={dashboard.queue}
+            onDeleteItem={dashboard.deleteQueueItem}
+          />
         </div>
-      }
-    >
-      <TikFinityDashboardContent />
-    </Suspense>
+      </div>
+    </AppShell>
   );
 }
