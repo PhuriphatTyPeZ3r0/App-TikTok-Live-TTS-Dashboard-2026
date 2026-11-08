@@ -92,7 +92,7 @@ export default function CockpitPage(): React.JSX.Element {
           <div>
             <div className="text-xs font-semibold text-slate-400">ห้องไลฟ์สตรีม (Room)</div>
             <div className="text-base font-bold text-white mt-0.5 font-mono truncate max-w-[130px]">
-              @{dashboard.username}
+              {dashboard.username ? `@${dashboard.username.replace(/^@/, "")}` : "@username"}
             </div>
           </div>
           <div className="w-10 h-10 rounded-xl bg-[#fe2c55]/10 border border-[#fe2c55]/20 flex items-center justify-center text-[#fe2c55]">

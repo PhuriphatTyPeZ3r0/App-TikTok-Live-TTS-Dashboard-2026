@@ -175,8 +175,9 @@ export function Navbar({
   const activeBreadcrumb = getBreadcrumbTitle(currentPath);
 
   // Extract reactive properties from DashboardContext with prop fallbacks
-  const rawUsername = usernameProp ?? dashboard?.username ?? "phuriphat_live";
-  const cleanUsername = rawUsername.replace(/^@/, "").trim() || "phuriphat_live";
+  const rawUsername = usernameProp !== undefined ? usernameProp : dashboard?.username;
+  const cleanUsername = rawUsername ? rawUsername.replace(/^@/, "").trim() : "";
+  const displayUsername = cleanUsername ? `@${cleanUsername}` : "@username";
 
   const masterTtsEnabled = masterTtsProp ?? dashboard?.masterTtsEnabled ?? true;
   const isTestingVoice = isTestingVoiceProp ?? dashboard?.isTestingVoice ?? false;
@@ -343,15 +344,23 @@ export function Navbar({
           type="button"
           onClick={handleRoomClick}
           className="flex items-center gap-2 bg-card/60 border border-border hover:border-emerald-500/50 hover:bg-emerald-500/10 px-3.5 py-1.5 rounded-full text-xs font-semibold text-foreground transition-all h-11 min-h-[44px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:scale-[0.98]"
-          title={`TikTok Live Room: @${cleanUsername} (Click to change room)`}
-          aria-label={`TikTok Live Room: @${cleanUsername} (Click to change room)`}
+          title={
+            cleanUsername
+              ? `TikTok Live Room: @${cleanUsername} (Click to change room)`
+              : "TikTok Live Room: @username (Click to set room)"
+          }
+          aria-label={
+            cleanUsername
+              ? `TikTok Live Room: @${cleanUsername} (Click to change room)`
+              : "TikTok Live Room: @username (Click to set room)"
+          }
         >
           <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden="true">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
           </span>
           <span className="truncate max-w-[100px] sm:max-w-[150px] font-medium">
-            @{cleanUsername}
+            {displayUsername}
           </span>
         </button>
 

@@ -129,7 +129,7 @@ export function DashboardProvider({
   initialSessionId = "",
   initialAdminToken = "",
   initialOverlayToken = "",
-  initialUsername = "phuriphat_live",
+  initialUsername = "",
 }: DashboardProviderProps): React.JSX.Element {
   const defaultBackend =
     initialBackendUrl ||

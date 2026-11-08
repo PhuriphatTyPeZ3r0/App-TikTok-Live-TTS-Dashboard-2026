@@ -78,7 +78,7 @@ export function AppShell({
 
   // Form input and submission state
   const [inputUsername, setInputUsername] = useState<string>(
-    dashboard?.username || "phuriphat_live"
+    dashboard?.username || ""
   );
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
@@ -263,7 +263,7 @@ export function AppShell({
                     type="text"
                     value={inputUsername}
                     onChange={(e) => setInputUsername(e.target.value)}
-                    placeholder="phuriphat_live"
+                    placeholder="username"
                     className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-[#181b24] border border-[#1e222d] focus:border-[#25f4ee] text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
                     required
                     autoFocus

@@ -246,7 +246,7 @@ describe("DashboardContext & DashboardProvider Suite", () => {
     assert.ok(result.current.backendUrl.includes("http"));
     assert.strictEqual(typeof result.current.sessionId, "string");
     assert.strictEqual(typeof result.current.adminToken, "string");
-    assert.strictEqual(result.current.username, "phuriphat_live");
+    assert.strictEqual(result.current.username, "");
     assert.strictEqual(result.current.masterTtsEnabled, true);
     assert.strictEqual(result.current.activeVoiceId, "yuta");
     assert.strictEqual(result.current.isSpeaking, false);

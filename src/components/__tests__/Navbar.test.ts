@@ -174,6 +174,18 @@ describe("Navbar Component Props & Callback Contract", () => {
     assert.strictEqual(element.props.pathname, "/voice");
   });
 
+  it("handles empty or unspecified username by falling back to @username placeholder", () => {
+    const elementWithoutUser = React.createElement(Navbar, {
+      username: "",
+    });
+    assert.ok(React.isValidElement(elementWithoutUser));
+    assert.strictEqual(elementWithoutUser.props.username, "");
+
+    const elementDefault = React.createElement(Navbar, {});
+    assert.ok(React.isValidElement(elementDefault));
+    assert.strictEqual(elementDefault.props.username, undefined);
+  });
+
   it("validates WCAG 2.1 AA touch target specifications", () => {
     // Contract check: All primary interaction buttons must provide minimum 44x44px target
     const minTargetPx = 44;
