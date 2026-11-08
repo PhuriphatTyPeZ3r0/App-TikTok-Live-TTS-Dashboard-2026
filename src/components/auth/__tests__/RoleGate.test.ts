@@ -6,8 +6,11 @@
  * Validates:
  * - Module exports and function signature for RoleGate functional component
  * - Role-Based Access Control (RBAC) declarative authorization rules
- * - Rendering children User Interface (UI) tree when allowed role matches
- * - Rendering fallback User Interface (UI) element when allowed role does not match
+ * - Explicit `userRole` override rendering children vs fallback
+ * - Hook-derived role resolution when `userRole` is omitted:
+ *   - Authenticated Superadministrator (claims 'admin' via Render OAuth)
+ *   - Authenticated Streamer (claims 'streamer' via Render OAuth)
+ *   - Unauthenticated guest session defaulting to 'streamer'
  * - Rendering loadingFallback placeholder during initial authentication revalidation
  * - Graceful default null fallback when no explicit fallback element is supplied
  * - Support for multi-tier authorization arrays (e.g. ['admin', 'streamer'])
@@ -25,11 +28,133 @@
  * ============================================================================
  */
 
-import { describe, it } from "node:test";
+import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import React from "react";
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RoleGate, type RoleGateProps } from "../RoleGate";
+
+(global as any).IS_REACT_ACT_ENVIRONMENT = true;
+
+const mockStorage = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = String(value);
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+    get store() {
+      return store;
+    },
+  };
+})();
+
+const mockDoc: any = {
+  nodeType: 9,
+  nodeName: "#document",
+  ownerDocument: null,
+  activeElement: null,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  createElement: (tag: string) => ({
+    nodeType: 1,
+    tagName: tag.toUpperCase(),
+    nodeName: tag.toUpperCase(),
+    setAttribute: () => {},
+    appendChild: () => {},
+    removeChild: () => {},
+    style: {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }),
+  createElementNS: (_ns: string, tag: string) => ({
+    nodeType: 1,
+    tagName: tag.toUpperCase(),
+    nodeName: tag.toUpperCase(),
+    setAttribute: () => {},
+    appendChild: () => {},
+    removeChild: () => {},
+    style: {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }),
+  createTextNode: () => ({ nodeType: 3, nodeName: "#text" }),
+  documentElement: { style: {} },
+};
+
+const mockWindow: any = {
+  HTMLIFrameElement: class {},
+  Element: class {},
+  HTMLElement: class {},
+  Document: class {},
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  localStorage: mockStorage,
+  location: {
+    search: "",
+    href: "http://localhost:3000/",
+  },
+  history: {
+    replaceState: (_data: any, _title: string, url: string) => {
+      mockWindow.location.href = url;
+      mockWindow.location.search = url.includes("?") ? url.substring(url.indexOf("?")) : "";
+    },
+  },
+  document: mockDoc,
+};
+
+mockDoc.defaultView = mockWindow;
+(global as any).window = mockWindow;
+(global as any).document = mockDoc;
+(global as any).localStorage = mockStorage;
+
+// Offline fetch mock preventing external network access during tests
+(global as any).fetch = async () => ({
+  ok: true,
+  status: 200,
+  json: async () => ({}),
+});
+
+/**
+ * Test renderer harness using React 19 createRoot and act.
+ */
+function renderRoleGate(element: React.ReactElement) {
+  let childMounted = false;
+  let fallbackMounted = false;
+
+  const container: any = {
+    nodeType: 1,
+    tagName: "DIV",
+    nodeName: "DIV",
+    ownerDocument: mockDoc,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    appendChild: () => {},
+    removeChild: () => {},
+    insertBefore: () => {},
+    style: {},
+  };
+
+  const root = createRoot(container);
+  act(() => {
+    root.render(element);
+  });
+
+  return {
+    unmount: () => {
+      act(() => {
+        root.unmount();
+      });
+    },
+  };
+}
 
 describe("RoleGate Component Contract & Exports", () => {
   it("exports RoleGate functional component successfully", () => {
@@ -55,7 +180,7 @@ describe("RoleGate Component Contract & Exports", () => {
   });
 });
 
-describe("RoleGate Declarative Access Control Authorization", () => {
+describe("RoleGate Declarative Access Control with Explicit userRole", () => {
   it("renders protected children when allowed role matches userRole", () => {
     const output = renderToStaticMarkup(
       React.createElement(
@@ -156,5 +281,185 @@ describe("RoleGate Declarative Access Control Authorization", () => {
     assert.ok(output.includes("Verifying Credentials..."));
     assert.ok(!output.includes("Superadmin Panel"));
     assert.ok(!output.includes("Access Denied"));
+  });
+});
+
+describe("RoleGate Hook-Derived Role Resolution (userRole omitted)", () => {
+  beforeEach(() => {
+    mockStorage.clear();
+    mockWindow.location.search = "";
+    mockWindow.location.href = "http://localhost:3000/";
+  });
+
+  it("renders protected children when hook resolves 'admin' role matching allowedRoles", () => {
+    mockStorage.setItem("streamvox_token", "mock-render-jwt-admin-token");
+
+    let childRendered = false;
+    let fallbackRendered = false;
+
+    const { unmount } = renderRoleGate(
+      React.createElement(
+        RoleGate,
+        {
+          allowedRoles: ["admin"],
+          fallback: React.createElement(() => {
+            fallbackRendered = true;
+            return null;
+          }),
+        },
+        React.createElement(() => {
+          childRendered = true;
+          return null;
+        })
+      )
+    );
+
+    assert.strictEqual(childRendered, true, "Protected child should render for hook admin role");
+    assert.strictEqual(fallbackRendered, false, "Fallback should not render for hook admin role");
+
+    unmount();
+  });
+
+  it("renders fallback when hook resolves 'admin' role not matching allowedRoles", () => {
+    mockStorage.setItem("streamvox_token", "mock-render-jwt-admin-token");
+
+    let childRendered = false;
+    let fallbackRendered = false;
+
+    const { unmount } = renderRoleGate(
+      React.createElement(
+        RoleGate,
+        {
+          allowedRoles: ["viewer"],
+          fallback: React.createElement(() => {
+            fallbackRendered = true;
+            return null;
+          }),
+        },
+        React.createElement(() => {
+          childRendered = true;
+          return null;
+        })
+      )
+    );
+
+    assert.strictEqual(childRendered, false, "Protected child should not render when role not allowed");
+    assert.strictEqual(fallbackRendered, true, "Fallback should render when role not allowed");
+
+    unmount();
+  });
+
+  it("renders protected children when hook resolves 'streamer' role matching allowedRoles", () => {
+    mockStorage.setItem("streamvox_token", "mock-render-jwt-streamer-token");
+
+    let childRendered = false;
+    let fallbackRendered = false;
+
+    const { unmount } = renderRoleGate(
+      React.createElement(
+        RoleGate,
+        {
+          allowedRoles: ["streamer"],
+          fallback: React.createElement(() => {
+            fallbackRendered = true;
+            return null;
+          }),
+        },
+        React.createElement(() => {
+          childRendered = true;
+          return null;
+        })
+      )
+    );
+
+    assert.strictEqual(childRendered, true, "Protected child should render for hook streamer role");
+    assert.strictEqual(fallbackRendered, false, "Fallback should not render for hook streamer role");
+
+    unmount();
+  });
+
+  it("renders fallback when hook resolves 'streamer' role not matching allowedRoles", () => {
+    mockStorage.setItem("streamvox_token", "mock-render-jwt-streamer-token");
+
+    let childRendered = false;
+    let fallbackRendered = false;
+
+    const { unmount } = renderRoleGate(
+      React.createElement(
+        RoleGate,
+        {
+          allowedRoles: ["admin"],
+          fallback: React.createElement(() => {
+            fallbackRendered = true;
+            return null;
+          }),
+        },
+        React.createElement(() => {
+          childRendered = true;
+          return null;
+        })
+      )
+    );
+
+    assert.strictEqual(childRendered, false, "Protected child should not render when admin is required");
+    assert.strictEqual(fallbackRendered, true, "Fallback should render when streamer attempts admin gate");
+
+    unmount();
+  });
+
+  it("defaults unauthenticated session without token to 'streamer' permitting streamer gate", () => {
+    // No token stored -> resolves effectiveRole = 'streamer'
+    let childRendered = false;
+    let fallbackRendered = false;
+
+    const { unmount } = renderRoleGate(
+      React.createElement(
+        RoleGate,
+        {
+          allowedRoles: ["streamer"],
+          fallback: React.createElement(() => {
+            fallbackRendered = true;
+            return null;
+          }),
+        },
+        React.createElement(() => {
+          childRendered = true;
+          return null;
+        })
+      )
+    );
+
+    assert.strictEqual(childRendered, true, "Default streamer fallback should satisfy streamer gate");
+    assert.strictEqual(fallbackRendered, false, "Fallback should not render for default streamer");
+
+    unmount();
+  });
+
+  it("blocks unauthenticated session without token from accessing admin-only gate", () => {
+    // No token stored -> effectiveRole defaults to 'streamer', blocking admin gate
+    let childRendered = false;
+    let fallbackRendered = false;
+
+    const { unmount } = renderRoleGate(
+      React.createElement(
+        RoleGate,
+        {
+          allowedRoles: ["admin"],
+          fallback: React.createElement(() => {
+            fallbackRendered = true;
+            return null;
+          }),
+        },
+        React.createElement(() => {
+          childRendered = true;
+          return null;
+        })
+      )
+    );
+
+    assert.strictEqual(childRendered, false, "Unauthenticated session must not pass admin gate");
+    assert.strictEqual(fallbackRendered, true, "Fallback must render for unauthenticated session");
+
+    unmount();
   });
 });

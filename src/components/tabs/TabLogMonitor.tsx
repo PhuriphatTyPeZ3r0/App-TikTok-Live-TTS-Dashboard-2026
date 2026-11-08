@@ -124,7 +124,7 @@ function formatTimestamp(isoString: string): string {
 }
 
 export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitorProps) {
-  const { role, isAdmin } = useRenderAuth();
+  const { isAdmin, token } = useRenderAuth();
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [selectedLevel, setSelectedLevel] = useState<LogLevel | "ALL">("ALL");
@@ -193,7 +193,12 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
         .replace(/\/+$/, "");
 
       const ingestUrl = `${apiHost}/api/logs?limit=200`;
-      const response = await fetch(ingestUrl);
+      const response = await fetch(ingestUrl, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          "Content-Type": "application/json",
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`Remote API returned HTTP status ${response.status}`);
@@ -235,7 +240,7 @@ export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitor
     } finally {
       setIsLoadingRemote(false);
     }
-  }, [backendUrl]);
+  }, [backendUrl, token]);
 
   // Toggle between Local client buffer and Remote backend server telemetry
   const handleToggleRemoteScope = () => {
