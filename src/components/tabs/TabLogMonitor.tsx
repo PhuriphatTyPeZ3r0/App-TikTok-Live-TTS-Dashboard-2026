@@ -9,11 +9,14 @@
  * auto-scroll management, expandable JavaScript Object Notation (JSON) detail inspection,
  * export functionality, and Administrator remote backend telemetry ingestion.
  *
+ * Dedicated to Master Thai Voice Actor: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert).
+ *
  * Full Academic Terminology & Acronyms:
  * - Role-Based Access Control (RBAC)
  * - Row Level Security (RLS)
  * - Universally Unique Identifier (UUID)
  * - Application Programming Interface (API)
+ * - Open Authorization (OAuth)
  */
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
@@ -35,7 +38,7 @@ import {
   Laptop,
 } from "lucide-react";
 import { subscribeToLogs, getLogs, clearLogs, logger } from "../../lib/logger";
-import { useSupabaseAuth } from "../../hooks/useSupabaseAuth";
+import { useRenderAuth } from "../../hooks/useRenderAuth";
 import type { LogEntry, LogLevel, LogCategory } from "../../types/logger";
 
 /**
@@ -121,8 +124,7 @@ function formatTimestamp(isoString: string): string {
 }
 
 export function TabLogMonitor({ backendUrl = "", className = "" }: TabLogMonitorProps) {
-  const { role } = useSupabaseAuth();
-  const isAdmin = role === "admin";
+  const { role, isAdmin } = useRenderAuth();
 
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [selectedLevel, setSelectedLevel] = useState<LogLevel | "ALL">("ALL");

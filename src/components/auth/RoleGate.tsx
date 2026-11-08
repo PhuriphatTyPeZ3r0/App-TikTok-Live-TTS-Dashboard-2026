@@ -8,20 +8,23 @@
  * - 'streamer': Broadcaster access allowing custom voice tuning persistence and live queue operation.
  * - 'viewer': Read-only observer scope for Open Broadcaster Software (OBS) browser overlays.
  *
- * Provides resilient offline fallback: when Supabase credentials are not configured,
- * the component operates in permissive mode to ensure local development workflows are never blocked.
+ * Aligned with Render FastAPI Open Authorization (OAuth) 2.0 backend and JWT session claims.
+ * Dedicated to Master Thai Voice Actor: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert).
  *
  * Full Academic Terminology & Acronyms:
  * - Role-Based Access Control (RBAC)
  * - Row Level Security (RLS)
  * - Universally Unique Identifier (UUID)
  * - Single Sign-On (SSO)
+ * - Open Authorization (OAuth)
+ * - JSON Web Token (JWT)
  * - Application Programming Interface (API)
+ * - User Interface (UI)
  */
 
 import React from "react";
 import type { UserRole } from "../../types/auth";
-import { useSupabaseAuth } from "../../hooks/useSupabaseAuth";
+import { useRenderAuth } from "../../hooks/useRenderAuth";
 
 /**
  * Properties for RoleGate declarative authorization wrapper.
@@ -49,28 +52,18 @@ export function RoleGate({
   userRole,
   loadingFallback = null,
 }: RoleGateProps): React.JSX.Element | null {
-  const { role: authRole, loading, isConfigured } = useSupabaseAuth();
+  const { role: authRole, isLoading: loading, isAdmin } = useRenderAuth();
 
-  // If initial authentication revalidation is in progress, show loading state
-  if (loading) {
+  // If initial authentication revalidation is in progress and no explicit userRole override is set
+  if (loading && !userRole) {
     return <>{loadingFallback}</>;
   }
 
   // Resolve effective Role-Based Access Control (RBAC) role
-  const effectiveRole = userRole || authRole;
-
-  // Explicit override check for testing and targeted sandboxing
-  if (userRole && !allowedRoles.includes(effectiveRole)) {
-    return <>{fallback}</>;
-  }
-
-  // Resilient Offline Fallback: If Supabase API is unconfigured, allow local access
-  if (!isConfigured) {
-    return <>{children}</>;
-  }
+  const effectiveRole = userRole || authRole || (isAdmin ? "admin" : "streamer");
 
   // Authorization Check
-  if (allowedRoles.includes(effectiveRole)) {
+  if (allowedRoles.includes(effectiveRole as UserRole)) {
     return <>{children}</>;
   }
 
