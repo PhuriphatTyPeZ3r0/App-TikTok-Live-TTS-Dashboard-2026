@@ -40,7 +40,11 @@ export interface TikFinitySettingsProps {
   onUpdate: (partial: Partial<TikFinitySettingsType>) => void;
   onSelectVoice?: (voiceId: string) => void;
   onChangeTuning?: (voiceId: string, tuning: VoiceTuningConfig) => void;
-  onTestVoice?: (voiceId: string, sampleText: string) => void | Promise<any>;
+  onTestVoice?: (
+    voiceId: string,
+    sampleText: string,
+    tuning?: VoiceTuningConfig
+  ) => void | Promise<any>;
   backendUrl?: string;
   testingVoiceId?: string | null;
   sessionId?: string;

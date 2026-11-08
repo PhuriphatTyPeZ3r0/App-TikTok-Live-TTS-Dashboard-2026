@@ -60,6 +60,7 @@ export interface QueueItem {
   timestamp: number;
   isTest?: boolean;
   voiceId?: string;
+  tuning?: VoiceTuningConfig;
 }
 
 export const DEFAULT_TIKFINITY_SETTINGS: TikFinitySettings = {

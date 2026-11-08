@@ -105,7 +105,7 @@ export interface DashboardContextType {
   ) => void;
   deleteQueueItem: (id: string) => void;
   togglePause: () => void;
-  testVoice: (voiceId?: string, sampleText?: string) => void;
+  testVoice: (voiceId?: string, sampleText?: string, explicitTuning?: VoiceTuningConfig) => void;
   isTestingVoice: boolean;
   testingVoiceId: string | null;
 }
@@ -530,7 +530,10 @@ export function DashboardProvider({
       const itemVoiceId =
         nextItem.voiceId || currentSettings.selectedVoiceId || activeVoiceId || "yuta";
       const itemTuning =
-        currentSettings.voiceTunings?.[itemVoiceId] || DEFAULT_VOICE_TUNING;
+        nextItem.tuning ||
+        voiceTunings[itemVoiceId] ||
+        currentSettings.voiceTunings?.[itemVoiceId] ||
+        DEFAULT_VOICE_TUNING;
 
       try {
         const cleanUrl = backendUrl.replace(/\/+$/, "");
@@ -587,9 +590,76 @@ export function DashboardProvider({
           const data = await res.json();
           if (data.audio_base64 && !isStale()) {
             if (currentSettings.inDashboardAudio || nextItem.isTest) {
-              if (typeof Audio !== "undefined") {
+              const speed = Math.max(0.5, Math.min(2.0, itemTuning.speed ?? 1.0));
+              const pitch = typeof itemTuning.pitch === "number" ? itemTuning.pitch : 0;
+              const voiceVolMultiplier = Math.max(0, Math.min(2.0, (itemTuning.volume ?? 100) / 100));
+              const targetGain = Math.max(0, Math.min(1.0, currentSettings.volume * voiceVolMultiplier));
+
+              // 1. Web Audio API Engine for accurate real-time speed, pitch shifting (detune), and gain
+              let playedViaWebAudio = false;
+              if (typeof window !== "undefined") {
+                const AudioContextClass =
+                  window.AudioContext || (window as any).webkitAudioContext;
+                if (AudioContextClass) {
+                  try {
+                    const ctx = new AudioContextClass();
+                    const binary = atob(data.audio_base64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                      bytes[i] = binary.charCodeAt(i);
+                    }
+                    const buffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+                    const source = ctx.createBufferSource();
+                    source.buffer = buffer;
+
+                    // Playback Speed (Rate)
+                    source.playbackRate.value = speed;
+
+                    // Pitch Shift via Detune (cents: ±1200 cents = ±1 octave)
+                    if (source.detune && pitch !== 0) {
+                      source.detune.value = pitch * 24;
+                    }
+
+                    // Acoustic Volume Gain
+                    const gainNode = ctx.createGain();
+                    gainNode.gain.setValueAtTime(targetGain, ctx.currentTime);
+
+                    source.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+
+                    source.onended = () => {
+                      try {
+                        ctx.close();
+                      } catch {}
+                      if (!isStale()) {
+                        audioRef.current = null;
+                        setIsPlaying(false);
+                        setIsSpeaking(false);
+                        setCurrentSpeaker(null);
+                      }
+                    };
+
+                    source.start(0);
+                    playedViaWebAudio = true;
+                    return;
+                  } catch (webAudioErr) {
+                    console.warn(
+                      "[DashboardContext] Web Audio API playback error, falling back to HTMLAudioElement:",
+                      webAudioErr
+                    );
+                  }
+                }
+              }
+
+              // 2. HTMLAudioElement Fallback
+              if (!playedViaWebAudio && typeof Audio !== "undefined") {
                 const audio = new Audio(`data:audio/mp3;base64,${data.audio_base64}`);
-                audio.volume = Math.max(0, Math.min(1, currentSettings.volume));
+                audio.volume = targetGain;
+                audio.playbackRate = speed;
+                audio.defaultPlaybackRate = speed;
+                if (pitch !== 0 && "preservesPitch" in audio) {
+                  (audio as any).preservesPitch = false;
+                }
                 audioRef.current = audio;
 
                 audio.onended = () => {
@@ -659,7 +729,10 @@ export function DashboardProvider({
       ) {
         const utterance = new SpeechSynthesisUtterance(nextItem.text);
         utterance.lang = "th-TH";
-        utterance.volume = Math.max(0, Math.min(1, currentSettings.volume));
+        const voiceVolMultiplier = Math.max(0, Math.min(2.0, (itemTuning.volume ?? 100) / 100));
+        utterance.volume = Math.max(0, Math.min(1, currentSettings.volume * voiceVolMultiplier));
+        utterance.rate = Math.max(0.5, Math.min(2.0, itemTuning.speed ?? 1.0));
+        utterance.pitch = Math.max(0.1, Math.min(2.0, 1.0 + (itemTuning.pitch ?? 0) / 50));
 
         utterance.onend = () => {
           if (!isStale()) {
@@ -815,10 +888,16 @@ export function DashboardProvider({
   }, [wsPauseAudio, wsResumeAudio]);
 
   const testVoice = useCallback(
-    (voiceId?: string, sampleText?: string) => {
+    (voiceId?: string, sampleText?: string, explicitTuning?: VoiceTuningConfig) => {
       const targetVoice = voiceId || activeVoiceId || "yuta";
       const sample =
         sampleText || "ทดสอบระบบเสียงสังเคราะห์ สตรีมว็อกซ์ไลฟ์สำเร็จ";
+      const currentSettings = settingsRef.current;
+      const targetTuning =
+        explicitTuning ||
+        voiceTunings[targetVoice] ||
+        currentSettings.voiceTunings?.[targetVoice] ||
+        DEFAULT_VOICE_TUNING;
 
       setIsTestingVoice(true);
       setTestingVoiceId(targetVoice);
@@ -831,6 +910,7 @@ export function DashboardProvider({
         timestamp: Date.now(),
         isTest: true,
         voiceId: targetVoice,
+        tuning: targetTuning,
       };
 
       setIsPaused(false);
@@ -841,7 +921,7 @@ export function DashboardProvider({
         setTestingVoiceId(null);
       }, 1000);
     },
-    [activeVoiceId]
+    [activeVoiceId, voiceTunings]
   );
 
   const value: DashboardContextType = {

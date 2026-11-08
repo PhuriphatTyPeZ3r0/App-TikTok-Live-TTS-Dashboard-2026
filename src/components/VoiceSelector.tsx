@@ -89,7 +89,11 @@ export interface VoiceSelectorProps {
   /** Callback invoked when the streamer selects a voice card. */
   onSelectVoice: (voiceId: string) => void;
   /** Callback invoked when the streamer clicks "ฟังตัวอย่างเสียง" on a card. */
-  onTestVoice?: (voiceId: string, sampleText: string) => void | Promise<any>;
+  onTestVoice?: (
+    voiceId: string,
+    sampleText: string,
+    tuning?: VoiceTuningConfig
+  ) => void | Promise<any>;
   /** Optional per-voice acoustic tuning map or active voice tuning configuration. */
   voiceTuning?: VoiceTuningConfig;
   /** Optional map of all per-voice tunings keyed by voice ID. */
@@ -151,9 +155,13 @@ export function VoiceSelector({
     const sampleText =
       VOICE_SAMPLE_TEXT_MAP[voice.id] ||
       `สวัสดีครับ ทดสอบเสียง ${voice.name} บนระบบ StreamVox Live`;
+    const thisVoiceTuning =
+      (voiceTunings && voiceTunings[voice.id.toLowerCase()]) ||
+      localTunings[voice.id.toLowerCase()] ||
+      DEFAULT_VOICE_TUNING;
     setLocalTestingId(voice.id);
     try {
-      await onTestVoice(voice.id, sampleText);
+      await onTestVoice(voice.id, sampleText, thisVoiceTuning);
     } finally {
       setTimeout(() => {
         setLocalTestingId((prev) => (prev === voice.id ? null : prev));
@@ -312,17 +320,35 @@ export function VoiceSelector({
               </h4>
             </div>
           </div>
-          <button
-            type="button"
-            data-testid="voice-tuning-reset"
-            onClick={() => updateActiveTuning(DEFAULT_VOICE_TUNING)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#12141a] hover:bg-[#fe2c55]/15 text-slate-300 hover:text-[#fe2c55] border border-[#1e222d] hover:border-[#fe2c55]/40 transition-colors"
-          >
-            <span className="material-symbols-rounded text-sm select-none">
-              restart_alt
-            </span>
-            <span>รีเซ็ตค่าเริ่มต้น</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="voice-tuning-test"
+              onClick={() => {
+                const sampleText =
+                  VOICE_SAMPLE_TEXT_MAP[activeId] ||
+                  `ทดสอบโทนเสียง ${activeVoice?.name || activeId} บนระบบ StreamVox Live`;
+                onTestVoice?.(activeId, sampleText, currentTuning);
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#25f4ee]/15 hover:bg-[#25f4ee]/25 text-[#25f4ee] border border-[#25f4ee]/40 transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-rounded text-sm select-none">
+                volume_up
+              </span>
+              <span>ทดสอบโทนเสียงนี้</span>
+            </button>
+            <button
+              type="button"
+              data-testid="voice-tuning-reset"
+              onClick={() => updateActiveTuning(DEFAULT_VOICE_TUNING)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#12141a] hover:bg-[#fe2c55]/15 text-slate-300 hover:text-[#fe2c55] border border-[#1e222d] hover:border-[#fe2c55]/40 transition-colors cursor-pointer"
+            >
+              <span className="material-symbols-rounded text-sm select-none">
+                restart_alt
+              </span>
+              <span>รีเซ็ตค่าเริ่มต้น</span>
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
