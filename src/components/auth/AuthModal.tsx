@@ -112,11 +112,25 @@ export function AuthModal({
     }
   };
 
-  // Local development mock authentication for offline administrator verification
-  const handleAdminMockLogin = () => {
+  // Local development / testing mode mock authentication
+  const handleAdminMockLogin = async () => {
     setErrorMessage(null);
-    mockLogin("admin");
+    setSubmitting(true);
+    await mockLogin("admin");
+    setSubmitting(false);
     setSuccessMessage("Authenticated as Superadministrator (phuriphathem@gmail.com).");
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => {
+      onClose();
+    }, 600);
+  };
+
+  const handleStreamerMockLogin = async () => {
+    setErrorMessage(null);
+    setSubmitting(true);
+    await mockLogin("streamer");
+    setSubmitting(false);
+    setSuccessMessage("Authenticated as Streamer (streamer@streamvox.live).");
     if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     closeTimerRef.current = setTimeout(() => {
       onClose();
@@ -315,25 +329,39 @@ export function AuthModal({
           </Button>
         </div>
 
-        {/* Local Development / Mock Administrator Mode */}
+        {/* Local Development / Mock Testing Mode (Enabled in Local & Deployed Production) */}
         <div className="p-3 rounded-md bg-muted/40 border border-border/70 flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
               <ShieldCheck className="w-4 h-4 text-primary" />
               <span>Local Dev / Testing Mode</span>
             </div>
-            <Badge variant="admin">Admin Bypass</Badge>
+            <Badge variant="admin">Direct Access</Badge>
           </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="default"
-            className="w-full h-11 min-h-[44px] text-xs font-semibold justify-center gap-2"
-            onClick={handleAdminMockLogin}
-          >
-            <KeyRound className="w-4 h-4" />
-            <span>Continue as Admin (phuriphathem@gmail.com)</span>
-          </Button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="default"
+              disabled={submitting}
+              className="w-full h-10 min-h-[40px] text-xs font-semibold justify-center gap-2"
+              onClick={handleAdminMockLogin}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Admin Mode</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              disabled={submitting}
+              className="w-full h-10 min-h-[40px] text-xs font-semibold justify-center gap-2 border-border"
+              onClick={handleStreamerMockLogin}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Streamer Mode</span>
+            </Button>
+          </div>
         </div>
 
         {/* Visual Boundary Divider */}

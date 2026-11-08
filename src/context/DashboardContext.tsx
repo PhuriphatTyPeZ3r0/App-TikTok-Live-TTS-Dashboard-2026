@@ -469,8 +469,11 @@ export function DashboardProvider({
 
   const handleUnauthorized = useCallback(() => {
     console.warn(
-      "[DashboardContext] Session credentials unauthorized or expired. Re-synchronizing..."
+      "[DashboardContext] Session credentials unauthorized or expired. Resetting session credentials..."
     );
+    setSessionId("");
+    setAdminToken("");
+    setOverlayToken("");
     try {
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
     } catch {}
@@ -536,7 +539,7 @@ export function DashboardProvider({
             ? `${cleanUrl}/api/session/${encodeURIComponent(sessionId)}/test-voice?token=${encodeURIComponent(adminToken || "")}`
             : `${cleanUrl}/api/session/test-voice`;
 
-        const res = await fetch(targetUrl, {
+        let res = await fetch(targetUrl, {
           method: "POST",
           signal: controller.signal,
           headers: {
@@ -560,6 +563,24 @@ export function DashboardProvider({
 
         if (res.status === 403 || res.status === 404) {
           handleUnauthorized();
+          // Fallback retry against generic test-voice endpoint without stale token
+          try {
+            res = await fetch(`${cleanUrl}/api/session/test-voice`, {
+              method: "POST",
+              signal: controller.signal,
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                text: nextItem.text,
+                user: nextItem.username,
+                voice_id: itemVoiceId,
+                speed: itemTuning.speed,
+                pitch: itemTuning.pitch,
+                volume: itemTuning.volume,
+              }),
+            });
+          } catch {}
         }
 
         if (res.ok) {

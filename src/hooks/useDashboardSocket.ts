@@ -362,11 +362,17 @@ export function useDashboardSocket({
 
         setIsConnected(false);
 
-        // Policy Violation (1008): Stale or invalid session/admin token
-        if (event.code === 1008) {
-          console.warn("[useDashboardSocket] WS closed with Policy Violation (1008). Requesting active session re-sync.");
+        // Policy Violation (1008) or Repeated Abnormal Closure (1006): Stale or invalid session/admin token
+        if (
+          event.code === 1008 ||
+          (event.code === 1006 && attemptRef.current >= 3)
+        ) {
+          console.warn(
+            `[useDashboardSocket] WS closed with code ${event.code}. Terminating reconnect loop and requesting session re-sync.`
+          );
           setError("Session credentials expired. Re-authenticating with active session...");
           setIsReconnecting(false);
+          clearReconnectTimeout();
           onUnauthorizedRef.current?.();
           return;
         }

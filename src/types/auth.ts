@@ -102,6 +102,6 @@ export interface RenderAuthState {
   /** Purge authentication credentials, terminate session, and reset local state. */
   logout: () => void;
   /** Developer mode fallback mock login simulator. */
-  mockLogin: (role?: "admin" | "streamer") => void;
+  mockLogin: (role?: "admin" | "streamer") => Promise<void> | void;
 }
 

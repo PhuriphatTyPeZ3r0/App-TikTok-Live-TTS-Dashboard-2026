@@ -129,6 +129,24 @@ export function useRenderAuth(): RenderAuthState {
           },
         });
 
+        if (response.status === 401 || response.status === 403) {
+          // Token expired or invalid: reset credentials cleanly without throwing errors
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem(STORAGE_KEY);
+            } catch {}
+          }
+          if (isMounted) {
+            setToken(null);
+            setUser(null);
+            setRole(null);
+            setIsAdmin(false);
+            setError(null);
+            setIsLoading(false);
+          }
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`Authentication verification failed with status HTTP ${response.status}`);
         }
@@ -249,7 +267,7 @@ export function useRenderAuth(): RenderAuthState {
    */
   const mockLogin = useCallback((mockRole: 'admin' | 'streamer' = 'admin') => {
     const email = mockRole === 'admin' ? SUPERADMIN_EMAIL : 'streamer@streamvox.live';
-    const name = mockRole === 'admin' ? 'System Administrator (Mock)' : 'Demo Streamer (Mock)';
+    const name = mockRole === 'admin' ? 'System Administrator (Dev)' : 'Demo Streamer (Dev)';
     const mockJwt = `mock-render-jwt-${mockRole}-${Date.now()}`;
 
     const mockUser: RenderUser = {
@@ -278,7 +296,7 @@ export function useRenderAuth(): RenderAuthState {
     setError(null);
     setIsLoading(false);
 
-    // Asynchronously notify backend mock login endpoint if available in local development
+    // Asynchronously request real signed JWT from backend mock-login if reachable
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_BASE_URL;
     fetch(`${baseUrl}/api/auth/mock-login`, {
       method: 'POST',
@@ -291,9 +309,7 @@ export function useRenderAuth(): RenderAuthState {
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem(STORAGE_KEY, data.token);
-            } catch {
-              // Ignore LocalStorage exceptions
-            }
+            } catch {}
           }
           setToken(data.token);
           setUser(data.user);
