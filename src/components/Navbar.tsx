@@ -254,13 +254,13 @@ export function Navbar({
     >
       {/* Left Section: Mobile Hamburger, Brand Emblem & Dynamic Route Breadcrumb */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {/* Responsive Mobile Drawer Menu Toggle (Flowbite Standard: inline-flex sm:hidden) */}
+        {/* Responsive Mobile Drawer Menu Toggle (Flowbite Standard: flex sm:hidden) */}
         <button
           type="button"
           onClick={handleToggleSidebar}
           aria-expanded={sidebarMobileOpen}
           aria-controls="logo-sidebar"
-          className="text-foreground bg-transparent border border-border hover:bg-accent focus:ring-2 focus:ring-ring font-medium rounded-lg text-sm p-2 focus:outline-none inline-flex sm:hidden min-h-[44px] min-w-[44px] items-center justify-center shrink-0 min-touch-target"
+          className="text-foreground bg-transparent border border-border hover:bg-accent focus:ring-2 focus:ring-ring font-medium rounded-lg text-sm p-2 focus:outline-none flex sm:hidden min-h-[44px] min-w-[44px] items-center justify-center shrink-0 min-touch-target"
           aria-label="Open sidebar"
           title="Open navigation menu (Open sidebar)"
         >
@@ -339,11 +339,11 @@ export function Navbar({
 
       {/* Right Section: Room Switcher, Master TTS Toggle, Quick Voice Test, Volume & SSO Profile */}
       <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 flex-wrap justify-end">
-        {/* TikTok Room Switcher Chip (Pulsing live dot, min-h-[44px]) */}
+        {/* TikTok Room Switcher Chip (Pulsing live dot, min-h-[44px] min-w-[44px]) */}
         <button
           type="button"
           onClick={handleRoomClick}
-          className="flex items-center gap-2 bg-card/60 border border-border hover:border-emerald-500/50 hover:bg-emerald-500/10 px-3.5 py-1.5 rounded-full text-xs font-semibold text-foreground transition-all h-11 min-h-[44px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:scale-[0.98]"
+          className="flex items-center justify-center gap-2 bg-card/60 border border-border hover:border-emerald-500/50 hover:bg-emerald-500/10 px-3.5 py-1.5 rounded-full text-xs font-semibold text-foreground transition-all h-11 min-h-[44px] min-w-[44px] select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:scale-[0.98]"
           title={
             cleanUsername
               ? `TikTok Live Room: @${cleanUsername} (Click to change room)`
@@ -370,7 +370,7 @@ export function Navbar({
           onClick={handleToggleMaster}
           aria-pressed={masterTtsEnabled}
           className={cn(
-            "flex items-center gap-2 px-3 py-1.5 rounded-lg border font-semibold text-xs h-11 min-h-[44px] transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:scale-[0.98]",
+            "flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg border font-semibold text-xs h-11 min-h-[44px] min-w-[44px] transition-all select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background active:scale-[0.98]",
             masterTtsEnabled
               ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.35)] hover:bg-emerald-500/25"
               : "bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.35)] hover:bg-rose-500/25"
@@ -411,7 +411,7 @@ export function Navbar({
           size="default"
           onClick={handleTestVoice}
           disabled={isTestingVoice}
-          className="h-11 min-h-[44px] px-3 sm:px-3.5 gap-2 text-xs font-semibold border-border hover:bg-accent hover:text-accent-foreground select-none"
+          className="h-11 min-h-[44px] min-w-[44px] px-3 sm:px-3.5 gap-2 text-xs font-semibold border-border hover:bg-accent hover:text-accent-foreground select-none flex items-center justify-center"
           title="Quick Voice Test"
           aria-label="Test Voice"
         >
@@ -427,13 +427,13 @@ export function Navbar({
 
         {/* Volume Control: Slider & Mute Toggle (settings.volume) */}
         <div
-          className="flex items-center gap-1.5 bg-card/60 border border-border px-2 py-1 rounded-lg shadow-xs h-11 min-h-[44px]"
+          className="flex items-center gap-1.5 bg-card/60 border border-border px-1.5 py-0.5 rounded-lg shadow-xs h-11 min-h-[44px]"
           title={`TTS Master Volume: ${Math.round(currentVolume * 100)}%`}
         >
           <button
             type="button"
             onClick={toggleMute}
-            className="h-9 w-9 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring select-none"
+            className="h-11 w-11 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring select-none"
             aria-label={isMuted ? "Unmute TTS audio" : "Mute TTS audio"}
             title={isMuted ? "Unmute TTS audio" : "Mute TTS audio"}
           >
@@ -468,7 +468,7 @@ export function Navbar({
           variant="outline"
           size="icon"
           onClick={toggleTheme}
-          className="h-11 w-11 min-h-[44px] min-w-[44px] border-border text-foreground hover:bg-accent hover:text-accent-foreground"
+          className="h-11 w-11 min-h-[44px] min-w-[44px] border-border text-foreground hover:bg-accent hover:text-accent-foreground flex items-center justify-center"
           title={
             theme === "dark"
               ? "Switch to Light Mode"

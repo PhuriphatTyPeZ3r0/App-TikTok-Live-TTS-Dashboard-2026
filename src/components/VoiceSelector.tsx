@@ -9,7 +9,25 @@
  * on mount, with a built-in fallback list of 5 curated Text-to-Speech (TTS) profiles so the User Interface (UI)
  * renders instantaneously even offline.
  *
- * Voice Actor Attribution: พิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert)
+ * Implements Web Content Accessibility Guidelines (WCAG) 2.1 AA:
+ * - Direct numeric input keyboard editing alongside range slider controls for Speed and Pitch
+ * - Minimum touch targets >= 44x44px for audition buttons and interactive controls
+ * - High-contrast semantic color feedback for acoustic tuning indicators
+ *
+ * Full Academic Terminology & Acronyms:
+ * - User Interface (UI)
+ * - User Experience (UX)
+ * - Design System (DS)
+ * - Web Content Accessibility Guidelines (WCAG)
+ * - Single-Page Application (SPA)
+ * - Asynchronous Server Gateway Interface (ASGI)
+ * - Representational State Transfer (REST)
+ * - Application Programming Interface (API)
+ * - Text-to-Speech (TTS)
+ *
+ * Master Thai Voice Actor Attribution:
+ * Dedicated to Master Thai Voice Actor: คุณพิพัฒน์ บุญสิทธิเลิศ (Phiphat Boonsitthilert).
+ * Official primary voice model for StreamVox Live Text-to-Speech (TTS) live streaming systems.
  */
 
 import React, { useEffect, useState } from "react";
@@ -352,18 +370,38 @@ export function VoiceSelector({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-          {/* Speed Slider */}
+          {/* Speed Slider & Direct Numeric Input */}
           <div className="flex flex-col gap-1.5 bg-[#12141a] p-2.5 rounded-lg border border-white/[0.05]">
             <div className="flex items-center justify-between text-xs">
-              <span className="inline-flex items-center gap-1 text-slate-300 font-medium">
+              <label
+                htmlFor="voice-tuning-speed-number"
+                className="inline-flex items-center gap-1 text-slate-300 font-medium"
+              >
                 <span className="material-symbols-rounded text-sm text-[#25f4ee] select-none">
                   speed
                 </span>
                 ความเร็ว (Speed)
-              </span>
-              <span className="font-mono font-bold text-[#25f4ee]">
-                {currentTuning.speed.toFixed(2)}x
-              </span>
+              </label>
+              <div className="flex items-center gap-0.5">
+                <input
+                  id="voice-tuning-speed-number"
+                  type="number"
+                  data-testid="voice-tuning-speed-input"
+                  aria-label="ความเร็วสังเคราะห์เสียง (Speed)"
+                  step="0.05"
+                  min="0.5"
+                  max="2.0"
+                  value={currentTuning.speed}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val)) {
+                      updateActiveTuning({ speed: Math.max(0.5, Math.min(2.0, val)) });
+                    }
+                  }}
+                  className="w-16 bg-transparent text-right font-mono font-semibold text-xs text-[#25f4ee] border border-white/10 hover:border-white/30 focus:border-[#25f4ee] focus:bg-[#181b24] rounded px-1 py-0.5 focus:outline-none transition-colors"
+                />
+                <span className="font-mono font-bold text-xs text-[#25f4ee] select-none">x</span>
+              </div>
             </div>
             <input
               type="range"
@@ -376,23 +414,42 @@ export function VoiceSelector({
                 updateActiveTuning({ speed: parseFloat(e.target.value) })
               }
               className="w-full accent-[#25f4ee] cursor-pointer"
+              aria-label="ตัวเลื่อนปรับความเร็วเสียง (Speed Slider)"
             />
           </div>
 
-          {/* Pitch Slider */}
+          {/* Pitch Slider & Direct Numeric Input */}
           <div className="flex flex-col gap-1.5 bg-[#12141a] p-2.5 rounded-lg border border-white/[0.05]">
             <div className="flex items-center justify-between text-xs">
-              <span className="inline-flex items-center gap-1 text-slate-300 font-medium">
+              <label
+                htmlFor="voice-tuning-pitch-number"
+                className="inline-flex items-center gap-1 text-slate-300 font-medium"
+              >
                 <span className="material-symbols-rounded text-sm text-[#fe2c55] select-none">
                   graphic_eq
                 </span>
                 ระดับเสียง (Pitch)
-              </span>
-              <span className="font-mono font-bold text-[#fe2c55]">
-                {currentTuning.pitch > 0
-                  ? `+${currentTuning.pitch}Hz`
-                  : `${currentTuning.pitch}Hz`}
-              </span>
+              </label>
+              <div className="flex items-center gap-0.5">
+                <input
+                  id="voice-tuning-pitch-number"
+                  type="number"
+                  data-testid="voice-tuning-pitch-input"
+                  aria-label="ระดับเสียงพิทช์ (Pitch)"
+                  step="1"
+                  min="-50"
+                  max="50"
+                  value={currentTuning.pitch}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      updateActiveTuning({ pitch: Math.max(-50, Math.min(50, val)) });
+                    }
+                  }}
+                  className="w-16 bg-transparent text-right font-mono font-semibold text-xs text-[#fe2c55] border border-white/10 hover:border-white/30 focus:border-[#fe2c55] focus:bg-[#181b24] rounded px-1 py-0.5 focus:outline-none transition-colors"
+                />
+                <span className="font-mono font-bold text-xs text-[#fe2c55] select-none">Hz</span>
+              </div>
             </div>
             <input
               type="range"
@@ -405,21 +462,42 @@ export function VoiceSelector({
                 updateActiveTuning({ pitch: parseInt(e.target.value, 10) })
               }
               className="w-full accent-[#fe2c55] cursor-pointer"
+              aria-label="ตัวเลื่อนปรับระดับเสียงพิทช์ (Pitch Slider)"
             />
           </div>
 
-          {/* Volume Slider */}
+          {/* Volume Slider & Direct Numeric Input */}
           <div className="flex flex-col gap-1.5 bg-[#12141a] p-2.5 rounded-lg border border-white/[0.05]">
             <div className="flex items-center justify-between text-xs">
-              <span className="inline-flex items-center gap-1 text-slate-300 font-medium">
+              <label
+                htmlFor="voice-tuning-volume-number"
+                className="inline-flex items-center gap-1 text-slate-300 font-medium"
+              >
                 <span className="material-symbols-rounded text-sm text-[#25f4ee] select-none">
                   volume_up
                 </span>
                 ความดัง (Volume)
-              </span>
-              <span className="font-mono font-bold text-[#25f4ee]">
-                {currentTuning.volume}%
-              </span>
+              </label>
+              <div className="flex items-center gap-0.5">
+                <input
+                  id="voice-tuning-volume-number"
+                  type="number"
+                  data-testid="voice-tuning-volume-input"
+                  aria-label="ระดับความดังเสียง (Volume)"
+                  step="5"
+                  min="0"
+                  max="200"
+                  value={currentTuning.volume}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      updateActiveTuning({ volume: Math.max(0, Math.min(200, val)) });
+                    }
+                  }}
+                  className="w-16 bg-transparent text-right font-mono font-semibold text-xs text-[#25f4ee] border border-white/10 hover:border-white/30 focus:border-[#25f4ee] focus:bg-[#181b24] rounded px-1 py-0.5 focus:outline-none transition-colors"
+                />
+                <span className="font-mono font-bold text-xs text-[#25f4ee] select-none">%</span>
+              </div>
             </div>
             <input
               type="range"
@@ -432,6 +510,7 @@ export function VoiceSelector({
                 updateActiveTuning({ volume: parseInt(e.target.value, 10) })
               }
               className="w-full accent-[#25f4ee] cursor-pointer"
+              aria-label="ตัวเลื่อนปรับความดังเสียง (Volume Slider)"
             />
           </div>
         </div>

@@ -226,7 +226,7 @@ export function NowSpeakingCard({
           type="button"
           onClick={onSkip}
           disabled={!currentSpeaker}
-          className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm min-touch-target min-h-[44px]"
+          className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 hover:border-slate-600 transition-all active:scale-95 disabled:text-zinc-400 disabled:border-border/60 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-1.5 shadow-sm min-touch-target min-h-[44px] min-w-[44px]"
           title="ข้ามข้อความปัจจุบัน (Skip)"
         >
           <span className="material-symbols-rounded text-base leading-none select-none">
@@ -240,7 +240,7 @@ export function NowSpeakingCard({
           type="button"
           onClick={onTogglePause}
           disabled={!currentSpeaker}
-          className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center gap-1.5 shadow-sm border min-touch-target min-h-[44px] ${
+          className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:text-zinc-400 disabled:border-border/60 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-1.5 shadow-sm border min-touch-target min-h-[44px] min-w-[44px] ${
             isPaused
               ? "bg-amber-500/15 text-amber-300 border-amber-500/40 hover:bg-amber-500/25"
               : "bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 hover:border-slate-600"

@@ -92,7 +92,7 @@ export function UserProfileButton({
     return (
       <div
         className={cn(
-          "flex items-center h-11 min-h-[44px] px-3.5 rounded-full border border-border bg-card animate-pulse gap-2 select-none",
+          "flex items-center justify-center h-11 min-h-[44px] min-w-[44px] px-3.5 rounded-full border border-border bg-card animate-pulse gap-2 select-none",
           className
         )}
         aria-label="Loading user profile"
@@ -119,7 +119,7 @@ export function UserProfileButton({
             }
           }}
           aria-label="Sign In to StreamVox Live"
-          className="h-11 min-h-[44px] px-4 gap-2 font-semibold shadow-xs"
+          className="h-11 min-h-[44px] min-w-[44px] px-4 gap-2 font-semibold shadow-xs flex items-center justify-center"
         >
           <User className="w-4 h-4" />
           <span>Sign In</span>
@@ -158,7 +158,7 @@ export function UserProfileButton({
         aria-expanded={dropdownOpen}
         aria-haspopup="menu"
         aria-label={`User profile for ${displayName}`}
-        className="flex items-center gap-2.5 h-11 min-h-[44px] px-3 rounded-full bg-card hover:bg-accent text-card-foreground hover:text-accent-foreground border border-border transition-colors shadow-xs active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+        className="flex items-center justify-center gap-2.5 h-11 min-h-[44px] min-w-[44px] px-3 rounded-full bg-card hover:bg-accent text-card-foreground hover:text-accent-foreground border border-border transition-colors shadow-xs active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
       >
         {/* Avatar Circle with Initials or User Photo */}
         {user.avatar_url ? (
@@ -255,7 +255,7 @@ export function UserProfileButton({
               variant="outline"
               size="default"
               onClick={handleSignOut}
-              className="w-full h-11 min-h-[44px] justify-center gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.98] transition-colors"
+              className="w-full h-11 min-h-[44px] min-w-[44px] flex items-center justify-center gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive active:scale-[0.98] transition-colors"
               aria-label="Log Out from StreamVox Live"
             >
               <LogOut className="w-4 h-4" />
